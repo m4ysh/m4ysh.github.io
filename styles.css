@@ -230,7 +230,7 @@ img { -webkit-user-drag: none; -webkit-touch-callout: none; }
   .topbar { grid-template-columns:1fr 1fr; min-height:75px; }.topbar p { display:none; }
   .hero { grid-template-columns:1fr; }.intro { padding:44px 0 35px; }
   .hero-visual { min-height:480px; border-left:0; border-top:1px solid var(--line); }
-  .terminal-nav { top:auto; bottom:0; width:105px; }.qr-link { width:42px; height:42px; }
+  .terminal-nav { top:0; bottom:auto; right:auto; left:0; width:105px; border-left:0; border-right:1px solid var(--line); }.qr-link { width:42px; height:42px; }
   .axis { display:none; }
   .archive-grid { grid-template-columns:1fr 1fr; gap:18px; }
   .readout, .contact { grid-template-columns:1fr; gap:28px; padding:80px 0; }
@@ -386,6 +386,4 @@ img { -webkit-user-drag: none; -webkit-touch-callout: none; }
   .logs-row { grid-template-columns: 1fr; gap: 6px; padding: 14px 0; }
   .logs-row .logs-cat, .logs-row .logs-arrow { display: none; }
   .signal-row { grid-template-columns: 30px 1fr; gap: 6px 10px; padding: 14px 0; }
-  .signal-row .signal-link { grid-column: 2; text-align: left; }
-  .archive-foot { justify-content: flex-start; }
-}
+  .signal-row .signal-link { grid-column: 2; 
