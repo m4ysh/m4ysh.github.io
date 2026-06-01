@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+      <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noimageindex, noarchive" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Replacing the imperative control flow inside an agent with a typed event log costs almost nothing and unlocks three things you wanted anyway: replay, observability, and parallelism. The model is just another handler."
+    />
+    <title>LOG 004 // Event Bus. Mayank Sharma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+<link rel="stylesheet" href="../styles.css" />
+    <script>document.addEventListener("contextmenu",function(e){var t=e.target;if(t&&t.tagName==="IMG"||t&&t.closest&&t.closest("img"))e.preventDefault()});</script>
+</head>
+  <body>
+    <header class="topbar frame">
+      <div>
+        <strong>MS ARCHIVE SYSTEM 1.0</strong>
+        <span>build: 05.31.26</span>
+      </div>
+      <p>FIELD LOG <br />EVENT BUS</p>
+      <div class="system-state"><i></i> SYSTEM STATUS: ONLINE</div>
+    </header>
+
+    <main>
+      <section class="post">
+        <aside class="axis axis-left"><span>LOG 004 / 007</span></aside>
+        <div class="intro">
+          <p class="eyebrow">FIELD LOG <span>//</span> EVENT LOG</p>
+          <h1 style="margin-top:14px;">A SMALL EVENT<br />BUS IS ALL<br />YOUR AGENT<br />NEEDS <b>_</b></h1>
+          <p class="lede">
+            If your agent is held together by a chain of imperative
+            <code>then()</code> calls, you do not have an agent. You have
+            a script with extra steps. A typed event log gives you
+            coordination, observability, and replay for the price of one
+            file. The model is just another handler in the pipeline.
+          </p>
+          <div class="post-meta">
+            <span><b>READ TIME</b> &nbsp; 24M</span>
+            <span><b>POSTED</b> &nbsp; 05.31.26</span>
+            <span><b>RUN</b> &nbsp; 11be-44a0</span>
+            <span><b>STATUS</b> &nbsp; PUBLISHED</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="../assets/blog-event-bus.svg" alt=""  draggable="false" ondragstart="return false;" />
+          <div class="image-meta">
+            <span>REC_004</span><span>SUBJECT: COORDINATION</span><span>CHANNEL: EVENTS</span>
+          </div>
+        </div>
+        <aside class="axis axis-right"><span>TIME: <em data-clock>00:00:00</em> GMT</span></aside>
+      </section>
+
+      <section class="log-body">
+        <div class="log-shell">
+          <div class="crumbs">
+            <a href="../index.html">// HOME</a>
+            <span>/</span>
+            <a href="../index.html#archive">/ ARCHIVE</a>
+            <span>/</span>
+            <span>LOG 004</span>
+          </div>
+
+          <header class="log-head">
+            <div class="log-id">LOG 004 <span>EVENTS / AGENT DESIGN / OBSERVABILITY / REPLAY</span></div>
+            <h1>A Small Event Bus Is All Your Agent Needs</h1>
+            <p class="log-deck">
+              Replacing the imperative control flow inside an agent with a
+              typed event log is a refactor I would do earlier and more
+              often. It costs you almost nothing and unlocks three things
+              you wanted anyway: replay, observability, and parallelism.
+              The model is not special. It is one more handler in a
+              pipeline that runs on a log.
+            </p>
+            <div class="log-stats">
+              <span><b>READ</b> &nbsp; 24M</span>
+              <span><b>FILED</b> &nbsp; 05.31.26</span>
+              <span><b>TAGS</b> &nbsp; events, agent-design, observability, replay, parallelism</span>
+              <span><b>RUN</b> &nbsp; 6 agents / 3.2x latency reduction</span>
+            </div>
+          </header>
+
+          <article class="prose">
+            <nav class="toc" style="margin: 0 0 36px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11.5px; line-height: 1.9; color: var(--ink);">
+              <p style="margin: 0 0 8px; color: var(--bright); font-size: 10px; letter-spacing: .05em;">// TABLE OF CONTENTS</p>
+              <a href="#chain" style="display:block; color: var(--ink);">01 &nbsp; The Chain Breaks</a>
+              <a href="#sourcing" style="display:block; color: var(--ink);">02 &nbsp; From Chain to Log: Event Sourcing</a>
+              <a href="#runtime" style="display:block; color: var(--ink);">03 &nbsp; The Runtime</a>
+              <a href="#log-db" style="display:block; color: var(--ink);">04 &nbsp; The Event Log as a Database</a>
+              <a href="#replay" style="display:block; color: var(--ink);">05 &nbsp; Replay</a>
+              <a href="#observability" style="display:block; color: var(--ink);">06 &nbsp; Observability</a>
+              <a href="#parallelism" style="display:block; color: var(--ink);">07 &nbsp; Parallelism</a>
+              <a href="#caveats" style="display:block; color: var(--ink);">08 &nbsp; Caveats</a>
+              <a href="#postmortem" style="display:block; color: var(--ink);">09 &nbsp; Post-Mortem</a>
+              <a href="#references" style="display:block; color: var(--ink);">10 &nbsp; References</a>
+            </nav>
+
+            <h2 id="chain">// 01 &nbsp; THE CHAIN BREAKS</h2>
+            <p class="drop">
+              The first version of any agent is a chain. <code>plan
+              &rarr; act &rarr; observe &rarr; decide &rarr; act &rarr;
+              observe &rarr; ...</code> It is the shape every tutorial
+              teaches, and it is the shape that breaks first. The chain
+              works for one task with three tools. It does not work for a
+              workflow with ten tools, two retrievers, a human in the
+              loop, and a webhook listener. The control flow becomes an
+              unreadable ladder of conditionals, and every new feature is
+              a new branch in a tree nobody wants to draw.
+            </p>
+            <p>
+              I watched this happen on a real codebase in early 2025. A
+              400-line agent went to 1,200 lines in three months. The
+              model changed twice. The tool registry grew from 5 to 14
+              tools. A human-in-the-loop step was added at the midpoint.
+              The conditional depth went from 2 to 5. The runtime
+              correctness went from "passes most of the time" to "passes
+              occasionally." The team spent more time debugging the
+              control flow than improving the prompts. The prompts were
+              fine. The prompts were being executed by code that had
+              grown past the point where anyone could reason about it.
+            </p>
+            <p>
+              The
+              <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener">ReAct</a>
+              paper (Yao et al., 2022) formalized the chain as
+              <i>reasoning + acting</i>: at each step, the model produces
+              a thought, an action, and an observation. The pattern is
+              elegant in the paper. In production, the pattern produces
+              three types of code: the chain itself, the wrapper around
+              the chain, and the wrapper around the wrapper. The chain
+              is fine. The wrappers are where the bugs live.
+            </p>
+            <p>
+              The deeper issue is that the chain is a state machine, but
+              the state is implicit. The state lives in the closure of
+              the function that runs the chain. The state is not
+              serializable, not queryable, not replayable. When the agent
+              fails at step 14, you cannot ask "what was the state at
+              step 7" without re-running the whole chain. When the agent
+              succeeds, you cannot ask "what would have happened if the
+              model had picked a different tool at step 4" without
+              re-running with a different model. The chain is a single
+              thread of execution. The chain is the only execution you
+              have. The chain is the only execution you can have.
+            </p>
+
+            <h2 id="sourcing">// 02 &nbsp; FROM CHAIN TO LOG: EVENT SOURCING</h2>
+            <p>
+              The fix is to stop calling tools and start emitting
+              events. The pattern has a name. Martin Fowler called it
+              <a href="https://martinfowler.com/eaaDev/EventSourcing.html" target="_blank" rel="noopener">event sourcing</a>
+              in 2005. The idea is simple: rather than storing the
+              current state of the system, store the sequence of events
+              that produced the current state. The current state is a
+              function of the events. The events are the source of
+              truth. The state is derived.
+            </p>
+            <p>
+              The pattern is not new. Domain-driven design has had
+              <a href="https://martinfowler.com/eaaDev/DomainEvent.html" target="_blank" rel="noopener">domain events</a>
+              since the mid-2000s. CQRS (Command Query Responsibility
+              Segregation) extends the pattern by separating the
+              write side (commands that produce events) from the read
+              side (queries that derive state from events). Apache
+              Kafka made the pattern operational at internet scale in
+              the early 2010s. EventStoreDB and similar systems
+              packaged the pattern as a database.
+            </p>
+            <p>
+              For agents, the pattern is almost too natural. An agent
+              is a system that produces and consumes events. The
+              events are the actions the agent takes, the observations
+              the agent receives, the decisions the agent makes. The
+              events are already what the agent is doing. The only
+              change is to make the events first-class.
+            </p>
+            <p>
+              The event log, in our agents, is a list of typed
+              records. Each record has a stable name, a timestamp, a
+              payload, and a unique id. The types are Pydantic models
+              in Python or dataclasses in Go or Rust. The naming is
+              dotted, in the CloudEvents style:
+              <code>plan.requested</code>, <code>tool.called</code>,
+              <code>tool.returned</code>, <code>plan.completed</code>.
+              The names are stable. The payload shape is stable. The
+              id is a UUID. The timestamp is monotonic per agent run.
+            </p>
+            <pre><code>@bus.handler("plan.requested")
+def on_plan(req: PlanRequested) -> list[Event]:
+    steps = planner(req.goal)
+    return [PlanProduced(plan=steps) for s in steps]
+
+@bus.handler("tool.called")
+def on_tool(call: ToolCalled) -> list[Event]:
+    result = registry[call.name].run(**call.args)
+    return [ToolReturned(call_id=call.id, result=result)]</code></pre>
+            <p>
+              Tools become handlers. The handler takes an event, does
+              some work, and returns zero or more events. The runtime
+              is a loop. It pulls the next event from the log,
+              dispatches it to the matching handlers, appends the
+              results, repeats. The agent's "decision" is just another
+              event. The model is a handler that takes the current
+              log slice and produces the next action event. The
+              control flow moves out of your code and into the log.
+            </p>
+
+            <h2 id="runtime">// 03 &nbsp; THE RUNTIME</h2>
+            <p>
+              The runtime is the smallest part of the system. It is
+              a loop, a dispatch table, and a log. The loop pulls the
+              next unhandled event. The dispatch table maps event
+              types to handler functions. The handler runs. The
+              returned events are appended to the log. The loop
+              continues until the log contains a terminal event
+              (<code>run.completed</code> or <code>run.failed</code>),
+              until a timeout, or until a max-iterations cap.
+            </p>
+            <p>
+              The runtime does not know about tools. The runtime does
+              not know about the model. The runtime does not know
+              about the agent. The runtime knows about events,
+              handlers, and a log. The model is a handler. A tool is
+              a handler. A retriever is a handler. A human-in-the-loop
+              step is a handler that waits for an external event. The
+              only special handler is the one that produces the next
+              action, which is the one that calls the LLM.
+            </p>
+            <p>
+              The advantage of this separation is that the LLM call
+              becomes a regular handler. It can be replaced, retried,
+              cached, or mocked without changing anything else. The
+              rest of the system does not care whether the action was
+              produced by a model, a cached lookup, a heuristic, or a
+              human. The rest of the system only cares that an event
+              of the right type was appended to the log.
+            </p>
+            <p>
+              The implementation we use is small. About 200 lines of
+              Python for the core. The dispatch table is a dict from
+              event type to handler. The handler signature is
+              <code>(event) -&gt; list[Event]</code>. The log is
+              an in-memory list during a run, flushed to disk or
+              object storage at the end. The events are JSON-encoded.
+              The runtime is single-threaded by default. Parallelism
+              is a runtime concern, not a handler concern (see
+              section 7).
+            </p>
+
+            <h2 id="log-db">// 04 &nbsp; THE EVENT LOG AS A DATABASE</h2>
+            <p>
+              Once the log is the source of truth, the log is a
+              database. Not metaphorically. The log is a
+              write-once, append-only, ordered sequence of records.
+              That is a database. The records are queryable. The
+              records are joinable. The records can be aggregated,
+              filtered, and windowed with the same primitives a
+              traditional database supports, plus the time-ordering
+              semantics that traditional databases do not have
+              natively.
+            </p>
+            <p>
+              The query primitives that become natural:
+            </p>
+            <ul>
+              <li><b>Filter by type.</b> "Show me every
+                <code>tool.called</code> event in the last 30 days."
+                The index is the event type. The query is a scan of
+                the index. The latency is bounded by the index
+                size, not the log size.</li>
+              <li><b>Window by run.</b> "Show me the events of run
+                R." The run id is a tag on every event. The query
+                is a filter on the run id. The result is the
+                trajectory.</li>
+              <li><b>Join on parent.</b> "Show me every
+                <code>tool.returned</code> that followed a
+                <code>tool.called</code> within 5 seconds." The
+                join key is the call id. The result is the tool
+                latency distribution.</li>
+              <li><b>Aggregate by handler.</b> "How many events did
+                the model handler produce per run, on average, by
+                task class?" The aggregation is a group-by on a
+                derived column.</li>
+            </ul>
+            <p>
+              The log is also a stream. The same events that go into
+              the log can be published to a broker
+              (Kafka, NATS, RabbitMQ) for downstream consumers.
+              Dashboards, alert systems, and other agents can
+              subscribe to the stream without coupling to the
+              producing agent. The producer and the consumers share
+              only the event schema. The producer does not know who
+              the consumers are.
+            </p>
+            <p>
+              The implementation we use for the query layer is
+              ClickHouse. Events are flushed from the in-memory log
+              to a ClickHouse table with a schema derived from the
+              event types. The schema is versioned with the event
+              types. Migrations are handled by ClickHouse's
+              <code>ALTER TABLE ... MODIFY COLUMN</code> primitives.
+              Most queries on a week of event data return in under
+              100ms. The latency is dominated by the network hop, not
+              the query.
+            </p>
+
+            <h2 id="replay">// 05 &nbsp; REPLAY</h2>
+            <p>
+              The first thing you notice when the agent's state is a
+              log is that replay is free. The log <i>is</i> the
+              trace. Given the same starting state and the same
+              events, the run is reproducible, including the model's
+              choices, because the model's inputs are just a slice of
+              the log. The model is a handler. The handler is a pure
+              function of its inputs. The inputs are in the log. The
+              run is reproducible.
+            </p>
+            <p>
+              Reproducibility is the foundation of three things that
+              are otherwise hard. The first is debugging. You can
+              stop a run, inspect the log, and identify the event
+              that caused the wrong outcome. You can then mutate
+              that event, replay from there, and observe the
+              different downstream behavior. The replay is the
+              debugger. The mutated event is the breakpoint.
+            </p>
+            <p>
+              The second is evaluation. You can take a production
+              log, run it through a different model, and compare the
+              new outcomes to the recorded ones. The comparison
+              answers "would model B have done better on this
+              trajectory?" The log is the test case. The new model
+              is the implementation under test. The eval is the
+              comparison. No new infrastructure required.
+            </p>
+            <p>
+              The third is regression testing. You can take a
+              snapshot of a passing log, replay it on every PR that
+              touches the agent code, and assert that the run still
+              passes. The snapshot is the regression test. The
+              replay is the assertion. The CI is the runner. The
+              pattern is borrowed from record-replay debuggers
+              like Mozilla's
+              <a href="https://rr-project.org/" target="_blank" rel="noopener">rr</a>
+              and the Time Travel Debugging in Visual Studio. The
+              novelty is applying it to a model-driven system.
+            </p>
+            <p>
+              The catch is that not every event is replayable. A
+              <code>send_email</code> event that actually sent an
+              email should not be replayed. We tag those events
+              with a <code>side_effect</code> flag. The replay
+              engine skips them by default. The flag is the
+              difference between a debugger and a liability.
+            </p>
+
+            <h2 id="observability">// 06 &nbsp; OBSERVABILITY</h2>
+            <p>
+              The second thing you notice is observability. A log
+              of typed events is a structured query. "How many
+              runs hit the rate limiter on the third tool call" is
+              a single line of SQL instead of a regex against a
+              string buffer. "Which step the agent is stuck on" is
+              a histogram. You can build dashboards on top of the
+              log without writing a parser. The dashboards are
+              free. The dashboards are correct. The dashboards
+              update as the event types evolve.
+            </p>
+            <blockquote>
+              If your agent's state is a chain, debugging it is
+              archaeology. If your agent's state is a log, debugging
+              it is a database query.
+            </blockquote>
+            <p>
+              The metrics that fall out for free:
+            </p>
+            <ul>
+              <li><b>Handler invocation counts.</b> How many times
+                did the model handler run per task class? Per run?
+                Per minute? The answer is a <code>COUNT</code> on
+                the event log.</li>
+              <li><b>Handler latency.</b> What is the p50 / p95 /
+                p99 latency of each handler? The answer is a
+                percentile aggregate on a timestamp diff.</li>
+              <li><b>Tool retry rates.</b> How often does a
+                <code>tool.called</code> event get retried? The
+                answer is a join on the call id.</li>
+              <li><b>Stuck-run detection.</b> Which runs have not
+                appended a new event in 60 seconds? The answer is a
+                query on the latest event timestamp per run.</li>
+              <li><b>Cost attribution.</b> How many tokens did
+                the model handler consume per task class? The
+                answer is a sum on a payload field.</li>
+            </ul>
+            <p>
+              None of these require instrumentation beyond the
+              event log itself. The event log is the
+              instrumentation. The event log is the
+              observability. The dashboards are views onto the
+              log. The alerts are queries that fire on conditions.
+              The whole stack is one database and one query
+              language.
+            </p>
+
+            <h2 id="parallelism">// 07 &nbsp; PARALLELISM</h2>
+            <p>
+              The third thing, the one that surprised me, is
+              parallelism. A chain is inherently sequential: step
+              two depends on step one's result. A log of
+              independent events is not. Once a handler emits two
+              or more events with no ordering constraint, the
+              runtime can dispatch them concurrently. In our
+              retrieval-heavy agents, this collapsed end-to-end
+              latency by a factor of three on a single-machine
+              setup, with no changes to the model.
+            </p>
+            <p>
+              The runtime we use detects independence by
+              inspecting the event payloads. Two events are
+              independent if they do not read or write the same
+              keys. The keys are declared in the event type's
+              schema. The runtime maintains a small read/write
+              set per in-flight event. When a new event is ready
+              to dispatch, the runtime checks whether its
+              declared reads are blocked by any in-flight event's
+              writes. If not, dispatch. If yes, wait.
+            </p>
+            <p>
+              The pattern is structured concurrency, in the
+              <a href="https://trio.readthedocs.io/" target="_blank" rel="noopener">Trio</a>
+              sense. The agent's "concurrency tree" is implicit in
+              the event log. The runtime materializes the tree
+              from the log. The tree is observable: you can
+              inspect the in-flight events and see which are
+              blocked, which are running, and which are ready.
+            </p>
+            <p>
+              The caveats are real. Concurrency introduces races
+              that the model can sometimes reason around and
+              sometimes cannot. Two tools that update the same
+              file are not safe to run concurrently, even if the
+              model "intends" them to. The runtime enforces the
+              read/write sets. The model can suggest. The
+              runtime decides.
+            </p>
+
+            <h2 id="caveats">// 08 &nbsp; CAVEATS</h2>
+            <p>
+              Two things to be careful about. The first is that
+              the event log grows. For long-running agents, you
+              need either a checkpointing strategy or a windowed
+              view that the model sees. We feed the model the
+              last N events (typically 20) plus any events it
+              explicitly asks for via a
+              <code>history(since=...)</code> call. The full
+              log is on disk. The model sees a slice. The slice
+              is what the model reasons about. The full log is
+              what the operator reasons about.
+            </p>
+            <p>
+              The second caveat is that the event log is a
+              liability in the same way that any database is a
+              liability. A log that contains prompts and
+              responses is a log that contains PII, IP, and
+              potentially regulated data. The log needs
+              retention policies, access controls, and
+              redaction. The events need to declare which
+              fields are sensitive. The runtime needs to
+              respect the declarations. The same hygiene that
+              applies to a production database applies to the
+              event log, with no exceptions.
+            </p>
+            <p>
+              The third caveat is that the event-sourced
+              pattern requires the team to think in events.
+              The chain is intuitive. The log is less so. New
+              team members will reach for the chain first.
+              The pattern is worth the ramp-up. The ramp-up is
+              a one-time cost. The chain's complexity is a
+              recurring cost.
+            </p>
+
+            <h2 id="postmortem">// 09 &nbsp; POST-MORTEM</h2>
+            <p>
+              A few things I want to flag from our own work.
+              The first is that the migration from chain to
+              log is not always worth it. For a single-task
+              agent with three tools and no human in the
+              loop, the chain is fine. The log pays off when
+              the system has more than one consumer of its
+              state (a dashboard, an evaluator, a debugger,
+              another agent). The break-even point in our
+              experience is around 800 lines of agent code.
+              Below that, the chain is simpler. Above that,
+              the chain is a liability.
+            </p>
+            <p>
+              The second is that the runtime is the part you
+              should over-engineer. The runtime is the part
+              that touches every event. The runtime is the
+              part that, if it has a bug, corrupts every run.
+              The runtime needs to be tested with the same
+              discipline as a database engine. The runtime
+              needs to handle the edge cases (concurrent
+              commits, partial failures, replay of
+              side-effecting events). The runtime is the
+              part that should have a formal specification.
+              The handlers can be loose. The runtime cannot.
+            </p>
+            <p>
+              The third is that the CloudEvents-style naming
+              is a small thing that matters a lot. Stable
+              event names let you build dashboards, alerts,
+              and migrations on top of the log without
+              coordinating with the producers. The producers
+              can rename their internal variables freely.
+              The event names are the contract. The contract
+              should be small, stable, and documented.
+            </p>
+            <p>
+              The runtime, the dispatch table, the replay
+              engine, and the ClickHouse query layer are
+              documented in the agent-runtime repo. The
+              DataJanitor and Mechatron agents both run on
+              the same event-bus runtime. The full source
+              and the test suite are at
+              <a href="https://huggingface.co/spaces/nebiuz/agent-runtime" target="_blank" rel="noopener">huggingface.co/spaces/nebiuz/agent-runtime</a>.
+            </p>
+
+            <h2 id="references">// 10 &nbsp; REFERENCES</h2>
+            <ol style="font-size: 12px; line-height: 1.8; color: var(--ink); padding-left: 22px;">
+              <li>Fowler, M. (2005). <i>Event Sourcing.</i> martinfowler.com. <a href="https://martinfowler.com/eaaDev/EventSourcing.html" target="_blank" rel="noopener">link</a></li>
+              <li>Fowler, M. (2011). <i>CQRS.</i> martinfowler.com. <a href="https://martinfowler.com/bliki/CQRS.html" target="_blank" rel="noopener">link</a></li>
+              <li>Vernon, V. (2013). <i>Implementing Domain-Driven Design.</i> Addison-Wesley.</li>
+              <li>Yao, S., et al. (2022). <i>ReAct: Synergizing Reasoning and Acting in Language Models.</i> ICLR 2023. arXiv:2210.03629. <a href="https://arxiv.org/abs/2210.03629" target="_blank" rel="noopener">link</a></li>
+              <li>Kreps, J., Narkhede, N., &amp; Rao, J. (2011). <i>Kafka: A Distributed Messaging System for Log Processing.</i> NetDB 2011.</li>
+              <li>CloudEvents Specification. (2019). <i>A Specification for Describing Event Data in Common Formats.</i> CNCF. <a href="https://cloudevents.io/" target="_blank" rel="noopener">link</a></li>
+              <li>O'Reilly. (2017). <i>Designing Data-Intensive Applications.</i> Chapter on event sourcing and CQRS.</li>
+              <li>Maric, O. (2017). <i>Practical Event Sourcing with Kotlin.</i> InfoQ.</li>
+              <li>EventStoreDB. (2024). <i>The EventStoreDB Documentation.</i> <a href="https://developers.eventstore.com/" target="_blank" rel="noopener">link</a></li>
+              <li>Roberts, M. (2018). <i>Time Travel Debugging for the Real World.</i> Mozilla. <a href="https://rr-project.org/" target="_blank" rel="noopener">link</a></li>
+              <li>Beaulieu, A. (2017). <i>Structured Concurrency.</i> Trio docs. <a href="https://trio.readthedocs.io/" target="_blank" rel="noopener">link</a></li>
+              <li>Wu, Q., et al. (2023). <i>AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation.</i> COLM 2024.</li>
+              <li>Hong, S., et al. (2024). <i>MetaGPT: Meta Programming for a Multi-Agent Collaborative Framework.</i> ICLR 2024.</li>
+              <li>Wang, X., et al. (2024). <i>OpenHands: An Open Platform for AI Software Developers as Generalist Agents.</i> arXiv:2407.16741.</li>
+              <li>Lamport, L. (1978). <i>Time, Clocks, and the Ordering of Events in a Distributed System.</i> CACM 21(7).</li>
+              <li>ClickHouse, Inc. (2024). <i>ClickHouse Documentation.</i> <a href="https://clickhouse.com/docs" target="_blank" rel="noopener">link</a></li>
+              <li>NATS.io. (2024). <i>NATS Documentation.</i> <a href="https://docs.nats.io/" target="_blank" rel="noopener">link</a></li>
+              <li>Marlow, S., et al. (2019). <i>Async, Futures, and the Disappearing Stack.</i> Haskell Symposium.</li>
+            </ol>
+
+            <h2 style="margin-top: 48px;">// ACKNOWLEDGMENTS</h2>
+            <p style="font-size: 12.5px; line-height: 1.75; color: var(--ink);">
+              The event-sourced runtime draws on a long lineage of
+              related work. The pattern itself is from Fowler's
+              event-sourcing write-up. The CQRS separation is from
+              Fowler's later CQRS post. The Kafka-style append-only
+              log is from Kreps, Narkhede, and Rao at LinkedIn. The
+              CloudEvents naming style is from the CNCF
+              specification. The structured-concurrency pattern is
+              from the Trio project. The Lamport timestamps in the
+              event ids are from Lamport's 1978 CACM paper. The
+              record-replay inspiration is from Mozilla's rr. The
+              event log as a database is the synthesis. The model
+              as a handler is the application of that synthesis
+              to language-model agents.
+            </p>
+
+            <p style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--faint); font-size: 10px; color: var(--dim);">
+              <b style="color: var(--bright); font-weight: 500;">TAGS</b> &nbsp; events &nbsp;·&nbsp; event-sourcing &nbsp;·&nbsp; cqrs &nbsp;·&nbsp; observability &nbsp;·&nbsp; replay &nbsp;·&nbsp; parallelism &nbsp;·&nbsp; agents &nbsp;·&nbsp; structured-concurrency
+            </p>
+
+          </article>
+
+          <nav class="log-foot">
+            <a href="../index.html#archive">&larr; BACK TO ARCHIVE</a>
+            <div class="nav">
+              <a href="log-003.html">&larr; PREV: LOG 003</a>
+              <a href="log-005.html">NEXT: LOG 005 &rarr;</a>
+            </div>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer frame">
+      <p>COPYRIGHT © MAYANK SHARMA 2026<br />ALL RIGHTS RESERVED</p>
+      <p>FIELD LOG 004<br />EVENT BUS</p>
+      <p>DESIGNED + BUILT BY HUMAN<br />FOR INTELLIGENT SYSTEMS</p>
+    </footer>
+
+    <dialog class="command-dialog">
+      <form method="dialog">
+        <div class="command-top"><span>&gt; NAVIGATE_ARCHIVE</span><button aria-label="Close">ESC</button></div>
+        <div class="command-list">
+          <a href="../index.html"><span>01</span>SCAN / HOME</a>
+          <a href="../index.html#projects"><span>02</span>WORK / PROJECTS</a>
+          <a href="../logs.html"><span>03</span>LOGS / ALL</a>
+          <a href="../index.html#contact"><span>04</span>CONTACT</a>
+          <a href="../resume.html"><span>05</span>FILE / RESUME</a>
+          <a href="../signals.html"><span>06</span>SIGNALS / NETWORK</a>
+        </div>
+      </form>
+    </dialog>
+    <script src="../src/legacy.js"></script>
+  </body>
+</html>

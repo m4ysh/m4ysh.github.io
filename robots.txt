@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /logs.html
+Allow: /signals.html
+Allow: /resume.html
+Allow: /blog/
+
+Disallow: /assets/
+Disallow: /*.otf$
+Disallow: /*.woff$
+Disallow: /*.woff2$
+
+Sitemap: /sitemap.xml

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+      <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noimageindex, noarchive" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="LLM judges are a liability when the task is open-ended. Verifiable rewards (like circuit F1 in mechanistic interpretability) are the only signal that survives contact with a capable agent."
+    />
+    <title>LOG 001 // Deterministic Rewards for Open-Ended Agents. Mayank Sharma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+<link rel="stylesheet" href="../styles.css" />
+    <script>document.addEventListener("contextmenu",function(e){var t=e.target;if(t&&t.tagName==="IMG"||t&&t.closest&&t.closest("img"))e.preventDefault()});</script>
+</head>
+  <body>
+    <header class="topbar frame">
+      <div>
+        <strong>MS ARCHIVE SYSTEM 1.0</strong>
+        <span>build: 05.31.26</span>
+      </div>
+      <p>FIELD LOG <br />DETERMINISTIC REWARDS</p>
+      <div class="system-state"><i></i> SYSTEM STATUS: ONLINE</div>
+    </header>
+
+    <main>
+      <section class="post">
+        <aside class="axis axis-left"><span>LOG 001 / 007</span></aside>
+        <div class="intro">
+          <p class="eyebrow">FIELD LOG <span>//</span> REWARD DESIGN</p>
+          <h1 style="margin-top:14px;">DETERMINISTIC<br />REWARDS FOR<br />OPEN-ENDED<br />AGENTS <b>_</b></h1>
+          <p class="lede">
+            If your agent produces a hypothesis and your judge is another LLM,
+            you have built a feedback loop between two models that share a
+            training distribution. The judge will reward what the agent would
+            have written. The agent will write what the judge would reward.
+            The loop converges on plausible prose. Plausible prose is not
+            mechanistic interpretability.
+          </p>
+          <div class="post-meta">
+            <span><b>READ TIME</b> &nbsp; 22M</span>
+            <span><b>POSTED</b> &nbsp; 05.31.26</span>
+            <span><b>RUN</b> &nbsp; edda7fd0</span>
+            <span><b>STATUS</b> &nbsp; PUBLISHED</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="../assets/blog-deterministic-rewards.png" alt=""  draggable="false" ondragstart="return false;" />
+          <div class="image-meta">
+            <span>REC_001</span><span>SUBJECT: VERIFIERS</span><span>CHANNEL: REWARD DESIGN</span>
+          </div>
+        </div>
+        <aside class="axis axis-right"><span>TIME: <em data-clock>00:00:00</em> GMT</span></aside>
+      </section>
+
+      <section class="log-body">
+        <div class="log-shell">
+          <div class="crumbs">
+            <a href="../index.html">// HOME</a>
+            <span>/</span>
+            <a href="../index.html#archive">/ ARCHIVE</a>
+            <span>/</span>
+            <span>LOG 001</span>
+          </div>
+
+          <header class="log-head">
+            <div class="log-id">LOG 001 <span>REWARD DESIGN / MECHANISTIC INTERPRETABILITY</span></div>
+            <h1>Deterministic Rewards for Open-Ended Agents</h1>
+            <p class="log-deck">
+              Most agent benchmarks can be evaluated by a Python function.
+              The hard part is choosing which function. This post is about
+              why LLM-as-judge is the wrong default for open-ended agent
+              tasks, what verifiable rewards (RLVR) actually buy you, and
+              how the Mechatron project uses circuit F1 as a deterministic
+              verifier for mechanistic interpretability agents.
+            </p>
+            <div class="log-stats">
+              <span><b>READ</b> &nbsp; 22M</span>
+              <span><b>FILED</b> &nbsp; 05.31.26</span>
+              <span><b>TAGS</b> &nbsp; RLVR, REWARD DESIGN, MECHANISTIC INTERPRETABILITY, MECHATRON</span>
+              <span><b>RUN</b> &nbsp; 11 TASKS / QWEN2.5-7B</span>
+            </div>
+          </header>
+
+          <article class="prose">
+            <nav class="toc" style="margin: 0 0 36px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11.5px; line-height: 1.9; color: var(--ink);">
+              <p style="margin: 0 0 8px; color: var(--bright); font-size: 10px; letter-spacing: .05em;">// TABLE OF CONTENTS</p>
+              <a href="#the-problem" style="display:block; color: var(--ink);">01 &nbsp; The Problem with LLM-as-Judge</a>
+              <a href="#rlvr" style="display:block; color: var(--ink);">02 &nbsp; The RLVR Pivot</a>
+              <a href="#mech-interp" style="display:block; color: var(--ink);">03 &nbsp; Why Mechanistic Interpretability Is the Hardest Case</a>
+              <a href="#circuit-f1" style="display:block; color: var(--ink);">04 &nbsp; Circuit F1 as a Verifier</a>
+              <a href="#design" style="display:block; color: var(--ink);">05 &nbsp; The Mechatron Design</a>
+              <a href="#results" style="display:block; color: var(--ink);">06 &nbsp; Results and Limits</a>
+              <a href="#references" style="display:block; color: var(--ink);">07 &nbsp; References</a>
+            </nav>
+
+            <h2 id="the-problem">// 01 &nbsp; THE PROBLEM WITH LLM-AS-JUDGE</h2>
+            <p class="drop">
+              The first time I built an agent that produced a hypothesis about
+              a transformer's internal circuitry, I evaluated it by sending
+              the hypothesis to GPT-4 and asking "is this correct?" The
+              results were plausible. The agent's hypotheses were
+              well-structured, used the right vocabulary, cited the right
+              papers. They were also, in retrospect, largely wrong. The
+              judge was rewarding fluency. The agent was producing
+              fluency. Everyone was happy.
+            </p>
+            <p>
+              The LLM-as-judge paradigm is now standard in agent
+              evaluation. The reasoning is straightforward: open-ended
+              tasks (creative writing, dialogue quality, hypothesis
+              generation) don't have a single correct answer, and
+              scaling human evaluation is expensive. Use a strong LLM to
+              score. It correlates with human raters, it's cheap, and it
+              runs in seconds. The results, in the average case, are
+              usable.
+            </p>
+            <p>
+              The failure modes are now well-documented. <i>Position
+              bias:</i> judges systematically prefer the first or second
+              response in a comparison, regardless of quality. <i>Verbosity
+              bias:</i> longer answers score higher. <i>Self-enhancement
+              bias:</i> judges rate outputs from the same model family
+              higher. <i>Anchoring:</i> scores shift when the prompt is
+              reworded, when the model is updated, or when the temperature
+              is changed. The <a href="https://mbrenndoerfer.com/writing/position-bias-in-llm-judges" target="_blank" rel="noopener">bias literature</a>
+              is extensive enough that, in 2026, deploying an LLM judge
+              without measuring its position and length bias is
+              professionally negligent.
+            </p>
+            <p>
+              The deeper problem is structural. When the judge and the
+              generator share a training distribution, they share
+              blind spots. The judge rewards what looks like the right
+              answer. The generator produces what looks like the right
+              answer. The loop converges on the joint mode of "plausible
+              text", which is, for open-ended tasks, exactly the wrong
+              signal. You want a signal that distinguishes "looks
+              plausible" from "is correct." LLM judges, by construction,
+              cannot make that distinction.
+            </p>
+
+            <h2 id="rlvr">// 02 &nbsp; THE RLVR PIVOT</h2>
+            <p>
+              The post-RLHF consensus is that the answer is <i>verifiable
+              rewards</i>: what the Tulu 3 paper (Lambert et al., 2024)
+              named <a href="https://arxiv.org/abs/2411.15124" target="_blank" rel="noopener">RLVR</a>
+              and what DeepSeek-R1 brought to global attention in January
+              2025. The paradigm is simple: instead of training against a
+              learned reward model, train against a deterministic verifier
+              that checks objective correctness. Math problems get a
+              symbolic solver. Code gets a unit test harness. JSON
+              outputs get a schema validator. The reward is binary (1
+              if the verifier passes, 0 if it doesn't), and the verifier
+              is external, auditable, and does not require human labelers
+              at training time.
+            </p>
+            <p>
+              The advantages are real. RLVR avoids the entire RLHF
+              overoptimization problem (Gao et al., 2023), the well-known
+              phenomenon where a learned reward model can be exploited
+              even when its scores correlate with human preferences. The
+              verifier doesn't have a learned failure mode. The verifier
+              is the failure mode. If the verifier is wrong, the agent
+              learns to satisfy the wrong thing. If the verifier is
+              right, the agent learns the right thing. There is no
+              gradient between.
+            </p>
+            <p>
+              The limits are also real. RLVR works in domains where
+              correctness is checkable: math, code, structured output,
+              games with clear win conditions. It works less well in
+              domains where the answer is a judgment, an aesthetic, a
+              hypothesis, a piece of writing. For those domains, the
+              field has reached for two compromises. The first is
+              <i>process reward models</i> (PRMs), learned verifiers
+              that score the reasoning trace, not just the final
+              answer. The second is <i>LLM-as-judge</i>, with all the
+              documented bias problems. Neither is a true verifier. Both
+              are useful. Both are, in the end, proxies.
+            </p>
+            <p>
+              The interesting design question, for any specific task, is:
+              can the correctness signal be made deterministic? If yes,
+              use a verifier. If no, use a judge, but measure its
+              biases, report them, and don't treat its output as ground
+              truth. The Mechatron project exists because, for one
+              specific kind of open-ended task, the answer is yes.
+            </p>
+
+            <h2 id="mech-interp">// 03 &nbsp; WHY MECHANISTIC INTERPRETABILITY IS THE HARDEST CASE</h2>
+            <p>
+              Mechanistic interpretability is the practice of reverse
+              engineering neural networks into human-understandable
+              circuits: subgraphs of attention heads and MLPs that
+              implement a specific behavior. The canonical example is
+              Wang et al.'s (2022) <i>Induction Heads</i> circuit in
+              two-layer attention models, or the IOI (Indirect Object
+              Identification) circuit in GPT-2 small. These are
+              <i>discoveries</i>: the model's algorithm, once found, is
+              a verifiable fact about the weights. Either the
+              "duplicate token head" exists at layer 9, head 6, or it
+              doesn't. Either the IOI circuit, when ablated, drops the
+              model's IOI accuracy to chance, or it doesn't.
+            </p>
+            <p>
+              The open-ended part is the <i>process</i> of finding the
+              circuit. An interpretability agent runs ablation
+              experiments, queries attention patterns, performs
+              activation patching, and forms a hypothesis about which
+              heads are involved. The hypothesis is open-ended. The
+              evaluation is not. If the agent claims head 9.6 is part
+              of the circuit, you can check by running the standard
+              circuit faithfulness ablation: ablate head 9.6, run the
+              model on IOI prompts, measure the accuracy drop. If the
+              drop matches the claim, the head is in the circuit. If
+              not, it isn't. The verifier is a few lines of PyTorch.
+            </p>
+            <p>
+              This is the design space where Mechatron lives. The task
+              is open-ended. The evaluation is deterministic. You can
+              train an agent against a verifier that doesn't share its
+              training distribution, doesn't have position bias, and
+              doesn't reward plausible prose. The agent learns to find
+              real circuits, not plausible-sounding ones.
+            </p>
+
+            <h2 id="circuit-f1">// 04 &nbsp; CIRCUIT F1 AS A VERIFIER</h2>
+            <p>
+              The standard circuit evaluation, after
+              <a href="https://arxiv.org/abs/2304.14997" target="_blank" rel="noopener">Conmy et al. (2023)</a>
+              and the ACDC algorithm, treats a circuit as a set of edges
+              in the model's computational graph. The "true" circuit is
+              the set of edges the model's computation actually depends
+              on. An agent's hypothesis is a set of edges it claims are
+              in the circuit. The comparison is a set comparison.
+            </p>
+            <p>
+              F1 is the harmonic mean of precision and recall. For
+              circuits:
+            </p>
+            <ul>
+              <li><b>Precision</b> = (claimed edges that are actually
+                in the true circuit) / (total claimed edges). Rewards
+                not over-claiming.</li>
+              <li><b>Recall</b> = (claimed edges that are actually in
+                the true circuit) / (total true edges). Rewards not
+                under-claiming.</li>
+              <li><b>F1</b> = 2 · (P · R) / (P + R). A single number
+                in [0, 1] that punishes both extremes.</li>
+            </ul>
+            <p>
+              Computing the components requires knowing the true
+              circuit. Mechatron solves this by <i>planting</i> the
+              ground truth. The agent operates on toy transformers
+              (1-layer, 2-layer, 4-layer) where the circuits are
+              constructed by the environment, not learned. The agent
+              sees the model. The agent does not see the circuit. The
+              environment knows the circuit. The verifier compares
+              agent claims to environment truth and emits F1.
+            </p>
+            <p>
+              The planted-circuit approach is, deliberately, the
+              opposite of the typical interpretability workflow. The
+              typical workflow takes a real model and tries to find
+              the circuit. The planted approach takes a known circuit
+              and asks an agent to find it. The evaluation is
+              unambiguous because the ground truth is in the
+              environment. The agent cannot game the verifier by
+              writing plausible-sounding hypotheses. The verifier
+              checks edges. Either the edges are right or they
+              aren't.
+            </p>
+            <p>
+              The F1 verifier has a false-positive penalty built in.
+              An agent that claims every head is in the circuit has
+              high recall and low precision. An agent that claims no
+              heads are in the circuit has high precision and low
+              recall. Both score near zero on F1. The agent has to
+              commit to a hypothesis, and the hypothesis has to be
+              right. There is no fluent middle ground.
+            </p>
+
+            <h2 id="design">// 05 &nbsp; THE MECHATRON DESIGN</h2>
+            <p>
+              Mechatron is a 11-task curriculum. The tasks are
+              organized by difficulty. Easy tasks have small circuits
+              in small models (1-layer attention with a 2-head
+              induction circuit). Hard tasks have larger circuits in
+              larger models (4-layer attention with composed
+              behaviors). Each task plants a specific circuit. Each
+              task gives the agent the same set of tools: ablation,
+              attention pattern queries, activation patching, and
+              per-head logit lens.
+            </p>
+            <p>
+              The reward function has three components, summed with
+              explicit weights:
+            </p>
+            <pre><code>reward = w_step · step_delta
+       + w_explore · exploration_bonus
+       + w_terminal · terminal_F1
+       - w_fp · false_positive_penalty</code></pre>
+            <p>
+              The <b>step_delta</b> is the change in F1 between
+              consecutive actions. This is the dense reward signal.
+              Ablating head 9.6 and seeing F1 go up gives a positive
+              delta. Ablating a random head and seeing F1 stay flat
+              gives zero. The agent learns which actions move the
+              needle.
+            </p>
+            <p>
+              The <b>exploration bonus</b> rewards actions that
+              produce new information, not just higher F1. Querying
+              the attention pattern on a new prompt is informative
+              even if it doesn't immediately change the hypothesis.
+              Without this term, the agent converges on the first
+              locally-optimal hypothesis and stops investigating.
+            </p>
+            <p>
+              The <b>terminal F1</b> is the F1 at the end of the
+              episode. This is the sparse reward signal. It is the
+              final answer. The dense signal is for learning; the
+              terminal signal is for grading.
+            </p>
+            <p>
+              The <b>false-positive penalty</b> subtracts from the
+              reward when the agent claims an edge that isn't in the
+              ground truth. This is what kills the "claim everything"
+              and "claim confidently wrong" strategies. The penalty
+              is calibrated so that an F1 of 0.3 is worth less than an
+              F1 of 0.5 minus the penalty for being wrong about a
+              single edge. The agent has to be approximately right,
+              not approximately confident.
+            </p>
+            <p>
+              The training was done with GRPO (Shao et al., 2024) and
+              Unsloth on Qwen2.5-7B. GRPO is a group-relative policy
+              optimization: the agent samples multiple rollouts per
+              task, scores them, and updates toward the within-group
+              winners. It is a clean fit for Mechatron because the
+              verifier is deterministic. There is no reward model to
+              overoptimize against, no learned biases to compound.
+              The verifier is the verifier.
+            </p>
+
+            <h2 id="results">// 06 &nbsp; RESULTS AND LIMITS</h2>
+            <p>
+              The headline number: on expert-difficulty tasks, the
+              trained agent improved mechanistic interpretability IOI
+              reward from 0.355 to 0.471 in 500 steps. That is a 32%
+              relative improvement on a non-trivial circuit-finding
+              task, in a domain where the previous state of the art
+              was human researchers running ablations by hand.
+            </p>
+            <p>
+              The interesting failures are not the ones the agent got
+              wrong. They are the ones the agent got right in a
+              different way than a human would. The agent finds
+              circuits that work but don't decompose into
+              human-interpretable modules. The F1 is high; the
+              explanation is missing. The verifier rewards the
+              outcome, not the story. This is a feature. It's why
+              the agent can find circuits humans miss, but it means
+              the agent's discoveries need to be interpreted by a
+              human after the fact. The agent is a search engine, not
+              a scientist.
+            </p>
+            <p>
+              The other limit is the toy models. Mechatron's 11 tasks
+              use 1-, 2-, and 4-layer transformers. Real
+              frontier-scale models are 80+ layers. The circuits in
+              frontier models are larger, more redundant, and more
+              entangled. The F1 verifier still works. The
+              computational cost of running the ablation experiments
+              scales with the number of edges. A 4-layer transformer
+              has a few hundred edges. An 80-layer model has tens of
+              thousands. The agent that finds a 4-layer circuit in 50
+              steps will need a different toolset to find an
+              80-layer circuit in the same number of steps. The
+              Mechatron approach is a proof of concept, not a
+              finished system.
+            </p>
+            <p>
+              The bigger lesson, though, is the verifier. F1 against
+              a planted ground truth is the cleanest reward signal
+              I have ever trained an agent against. There is no
+              position bias. There is no verbosity bias. There is
+              no plausible-but-wrong. The agent either finds the
+              circuit or it doesn't. The reward is the same every
+              time. The verifier is auditable in 20 lines of Python.
+              If you can make your task's correctness checkable, do
+              it. If you can't, use a judge, but measure it, report
+              it, and don't pretend it's ground truth.
+            </p>
+            <p>
+              The environment, the verifier, and the 11-task
+              curriculum are all at
+              <a href="https://huggingface.co/spaces/nebiuz/mechatron-env/tree/main" target="_blank" rel="noopener">huggingface.co/spaces/nebiuz/mechatron-env</a>.
+              The training code and the GRPO+Unsloth notebook are in
+              the same repository. The full task list, the ground
+              truth circuits, and the per-task reward curves are
+              documented in the project's README.
+            </p>
+
+            <h2 id="references">// 07 &nbsp; REFERENCES</h2>
+            <ol style="font-size: 12px; line-height: 1.8; color: var(--ink); padding-left: 22px;">
+              <li>Lambert, N., et al. (2024). <i>Tulu 3: Pushing Frontiers in Open Language Model Post-Training.</i> arXiv:2411.15124.</li>
+              <li>DeepSeek-AI. (2025). <i>DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.</i> arXiv:2501.12948.</li>
+              <li>Conmy, A., Mavor-Parker, A. N., Lynch, A., Heimersheim, S., &amp; Garriga-Alonso, A. (2023). <i>Towards Automated Circuit Discovery for Mechanistic Interpretability.</i> NeurIPS 2023 Spotlight. arXiv:2304.14997.</li>
+              <li>Miller, J., Chughtai, B., &amp; Saunders, W. (2024). <i>Transformer Circuit Evaluation Metrics Are Not Robust.</i> COLM 2024.</li>
+              <li>Wang, K., Variengien, A., Conmy, A., Shleifer, S., &amp; Batson, J. (2022). <i>Interpretability in the Wild: a Circuit for Indirect Object Identification in GPT-2 Small.</i> arXiv:2211.00593.</li>
+              <li>Olsson, C., et al. (2022). <i>In-context Learning and Induction Heads.</i> Anthropic.</li>
+              <li>Gao, L., Schulman, J., &amp; Hilton, J. (2023). <i>Scaling Laws for Reward Model Overoptimization.</i> ICML 2023. arXiv:2210.10760.</li>
+              <li>Shao, Z., et al. (2024). <i>DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models.</i> arXiv:2402.03300.</li>
+              <li>Zheng, L., et al. (2023). <i>Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.</i> NeurIPS 2023.</li>
+              <li>Li, Q., et al. (2026). <i>Evaluating Scoring Bias in LLM-as-a-Judge.</i> arXiv:2506.22316.</li>
+              <li>Brenndoerfer, M. (2026). <i>Position Bias in LLM Judges: Measurement and Mitigation.</i></li>
+              <li>Hadad, I., Katz, G., &amp; Bassan, S. (2026). <i>Formal Mechanistic Interpretability: Automated Circuit Discovery with Provable Guarantees.</i> ICLR 2026. arXiv:2602.16823.</li>
+              <li>Helff, L., et al. (2026). <i>LLMs Gaming Verifiers: RLVR can Lead to Reward Hacking.</i> arXiv:2604.15149.</li>
+            </ol>
+
+            <h2 style="margin-top: 48px;">// ACKNOWLEDGMENTS</h2>
+            <p style="font-size: 12.5px; line-height: 1.75; color: var(--ink);">
+              The Mechatron environment builds directly on the
+              circuit-discovery workflow from Conmy et al. (2023),
+              the IOI circuit literature from Wang et al. (2022),
+              and the Anthropic interpretability team's induction
+              heads work. The GRPO training loop follows Shao et al.
+              (2024). The verifier pattern follows the RLVR framing
+              from Lambert et al. (2024). The toy transformer
+              implementations are written from scratch on the
+              standard attention setup. The false-positive penalty
+              calibration was the most painful hyperparameter search
+              I've ever run; thanks to the Unsloth team for making
+              the training loop fast enough to iterate.
+            </p>
+
+            <p style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--faint); font-size: 10px; color: var(--dim);">
+              <b style="color: var(--bright); font-weight: 500;">TAGS</b> &nbsp; rlvr &nbsp;·&nbsp; reward-design &nbsp;·&nbsp; mechanistic-interpretability &nbsp;·&nbsp; circuit-discovery &nbsp;·&nbsp; llm-judges &nbsp;·&nbsp; verifiable-rewards &nbsp;·&nbsp; agents
+            </p>
+
+          </article>
+
+          <nav class="log-foot">
+            <a href="../index.html#archive">&larr; BACK TO ARCHIVE</a>
+            <div class="nav">
+              <a href="log-007.html">&larr; PREV: LOG 007</a>
+              <a href="log-002.html">NEXT: LOG 002 &rarr;</a>
+            </div>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer frame">
+      <p>COPYRIGHT © MAYANK SHARMA 2026<br />ALL RIGHTS RESERVED</p>
+      <p>FIELD LOG 001<br />DETERMINISTIC REWARDS</p>
+      <p>DESIGNED + BUILT BY HUMAN<br />FOR INTELLIGENT SYSTEMS</p>
+    </footer>
+
+    <dialog class="command-dialog">
+      <form method="dialog">
+        <div class="command-top"><span>&gt; NAVIGATE_ARCHIVE</span><button aria-label="Close">ESC</button></div>
+        <div class="command-list">
+          <a href="../index.html"><span>01</span>SCAN / HOME</a>
+          <a href="../index.html#projects"><span>02</span>WORK / PROJECTS</a>
+          <a href="../logs.html"><span>03</span>LOGS / ALL</a>
+          <a href="../index.html#contact"><span>04</span>CONTACT</a>
+          <a href="../resume.html"><span>05</span>FILE / RESUME</a>
+          <a href="../signals.html"><span>06</span>SIGNALS / NETWORK</a>
+        </div>
+      </form>
+    </dialog>
+    <script src="../src/legacy.js"></script>
+  </body>
+</html>

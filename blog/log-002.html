@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+      <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noimageindex, noarchive" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="State leakage in agent evaluation environments: the four families, why snapshot diffing catches what dashboards cannot, and what the Mechatron env's three-week tokenizer bug taught me about PRNG plumbing."
+    />
+    <title>LOG 002 // State Leakage in Agent Envs. Mayank Sharma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+<link rel="stylesheet" href="../styles.css" />
+    <script>document.addEventListener("contextmenu",function(e){var t=e.target;if(t&&t.tagName==="IMG"||t&&t.closest&&t.closest("img"))e.preventDefault()});</script>
+</head>
+  <body>
+    <header class="topbar frame">
+      <div>
+        <strong>MS ARCHIVE SYSTEM 1.0</strong>
+        <span>build: 05.31.26</span>
+      </div>
+      <p>FIELD LOG <br />STATE LEAKAGE</p>
+      <div class="system-state"><i></i> SYSTEM STATUS: ONLINE</div>
+    </header>
+
+    <main>
+      <section class="post">
+        <aside class="axis axis-left"><span>LOG 002 / 007</span></aside>
+        <div class="intro">
+          <p class="eyebrow">FIELD LOG <span>//</span> ENV DESIGN</p>
+          <h1 style="margin-top:14px;">STATE LEAKAGE<br />IN AGENT<br />ENVS <b>_</b></h1>
+          <p class="lede">
+            A baseline that ran at 41% on Monday runs at 38% on Wednesday. The
+            model didn't change. The prompt didn't change. The data didn't
+            change. The environment did. Drift is what reproducibility bugs
+            look like once they escape the lab.
+          </p>
+          <div class="post-meta">
+            <span><b>READ TIME</b> &nbsp; 28M</span>
+            <span><b>POSTED</b> &nbsp; 05.31.26</span>
+            <span><b>RUN</b> &nbsp; 7d11-22ae</span>
+            <span><b>STATUS</b> &nbsp; PUBLISHED</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="../assets/blog-state-leakage.png" alt=""  draggable="false" ondragstart="return false;" />
+          <div class="image-meta">
+            <span>REC_002</span><span>SUBJECT: ENV ISOLATION</span><span>CHANNEL: SYSTEMS</span>
+          </div>
+        </div>
+        <aside class="axis axis-right"><span>TIME: <em data-clock>00:00:00</em> GMT</span></aside>
+      </section>
+
+      <section class="log-body">
+        <div class="log-shell">
+          <div class="crumbs">
+            <a href="../index.html">// HOME</a>
+            <span>/</span>
+            <a href="../index.html#archive">/ ARCHIVE</a>
+            <span>/</span>
+            <span>LOG 002</span>
+          </div>
+
+          <header class="log-head">
+            <div class="log-id">LOG 002 <span>SYSTEMS / ENV DESIGN / PRNG / CONTAINERS</span></div>
+            <h1>State Leakage in Agent Environments</h1>
+            <p class="log-deck">
+              Reproducible agent evaluation is a hermeticity problem. The
+              model, the prompt, and the dataset get the attention because
+              they are the visible inputs. The environment is supposed to be
+              invisible. When it stops being invisible, the numbers drift,
+              the regression searches fail, and the bug ends up being a
+              tokenizer. This post is about the four families of leakage I
+              have hit, the one technique that has caught more of them than
+              anything else, and what they cost in practice.
+            </p>
+            <div class="log-stats">
+              <span><b>READ</b> &nbsp; 28M</span>
+              <span><b>FILED</b> &nbsp; 05.31.26</span>
+              <span><b>TAGS</b> &nbsp; env-design, reproducibility, prng, containers, snapshot-diffing</span>
+              <span><b>RUN</b> &nbsp; 11 envs / 4 weeks</span>
+            </div>
+          </header>
+
+          <article class="prose">
+            <nav class="toc" style="margin: 0 0 36px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11.5px; line-height: 1.9; color: var(--ink);">
+              <p style="margin: 0 0 8px; color: var(--bright); font-size: 10px; letter-spacing: .05em;">// TABLE OF CONTENTS</p>
+              <a href="#drift" style="display:block; color: var(--ink);">01 &nbsp; The Drift</a>
+              <a href="#state" style="display:block; color: var(--ink);">02 &nbsp; What State Is</a>
+              <a href="#families" style="display:block; color: var(--ink);">03 &nbsp; The Four Families of Leakage</a>
+              <a href="#snapshot" style="display:block; color: var(--ink);">04 &nbsp; Detection: Snapshot Diffing</a>
+              <a href="#mechatron" style="display:block; color: var(--ink);">05 &nbsp; A Concrete Case: The Mechatron Tokenizer</a>
+              <a href="#prng" style="display:block; color: var(--ink);">06 &nbsp; PRNG, Time, and the Limits of Seeding</a>
+              <a href="#cost" style="display:block; color: var(--ink);">07 &nbsp; The Cost of Drift</a>
+              <a href="#postmortem" style="display:block; color: var(--ink);">08 &nbsp; Post-Mortem</a>
+              <a href="#references" style="display:block; color: var(--ink);">09 &nbsp; References</a>
+            </nav>
+
+            <h2 id="drift">// 01 &nbsp; THE DRIFT</h2>
+            <p class="drop">
+              The first time I noticed state leakage, I didn't notice it. A
+              baseline I had been running for two weeks on an interpretability
+              task started coming in lower. Not by much. The first run on
+              Monday was 41.2%. Wednesday it was 39.8%. Friday, 38.4%. The
+              numbers walked down a slope, slowly enough that the rolling
+              averages hid it for a week. I assumed a model regression. I
+              assumed a prompt regression. I checked the dataset. The dataset
+              was the same. The prompt was the same. The model was the same
+              checkpoint. The evaluation harness was the same. The container
+              image was, in theory, the same.
+            </p>
+            <p>
+              The container image was not the same. The tokenizer cache that
+              the env kept at module scope was using, on the second run, a
+              tokenizer object that had been initialized with a different
+              vocabulary mapping than the one the test fixtures expected. The
+              vocab mapping had not changed. What had changed was which key
+              in the cache had been warmed first. The first episode of the
+              first run warmed a key for vocab A. The first episode of the
+              second run warmed a key for vocab B. The PRNG seed was the
+              same. The cache was not. The eval was not stochastic. The eval
+              was order-dependent in a way that was not in the seed.
+            </p>
+            <p>
+              It took me three weeks to find. The fix was thirty seconds. The
+              lesson was not the fix. The lesson was that "reproducible" is
+              a property of the system, not a property of the seed.
+            </p>
+
+            <h2 id="state">// 02 &nbsp; WHAT STATE IS</h2>
+            <p>
+              An agent evaluation environment is, formally, a stateful
+              process. It receives an action from the agent, updates its
+              internal state, returns an observation. An episode is a
+              trajectory of state-action-observation tuples. A reset is a
+              transition back to a known initial state. The reproducibility
+              property we want is: given the same seed, the same episode
+              produces the same trajectory.
+            </p>
+            <p>
+              What breaks reproducibility is the gap between "the state the
+              env thinks it is in" and "the state the env actually is in."
+              The env has a mental model. The env has a filesystem, a
+              process table, a network namespace, a clock, a set of cached
+              connections, a set of module-level globals. The reset is a
+              function on the mental model. It does not necessarily touch
+              the second list. When the two diverge, the env lies to
+              itself, and the lie shows up in the data.
+            </p>
+            <p>
+              The naive way to think about state is the variable scope. A
+              function-local variable goes out of scope at return. A
+              class-level variable persists for the lifetime of the object.
+              A module-level variable persists for the lifetime of the
+              interpreter. A file on disk persists until something deletes
+              it. A socket persists until it is closed. A child process
+              persists until it exits. A clock keeps ticking.
+            </p>
+            <p>
+              The less naive way to think about state is the lifetime
+              hierarchy. Reset, in most agent eval harnesses, is supposed to
+              clear the env's logical state (the game world, the
+              observable). It is not supposed to clear the env's physical
+              state (the Python interpreter, the OS, the container, the
+              network). The physical state is supposed to be initialized
+              once and never change. The guarantee fails when the
+              initialization of the physical state is order-dependent,
+              random, or time-dependent.
+            </p>
+            <p>
+              DeepMind's
+              <a href="https://arxiv.org/abs/1912.09788" target="_blank" rel="noopener">Crafter</a>
+              benchmark (Hafner, 2021) makes this hierarchy explicit. The
+              benchmark serves episodes from a deterministic world
+              generator; the reset clears the world; the world is regenerated
+              from the seed on the next episode. The physical state (the
+              Python interpreter, the rendering context) is shared across
+              episodes. The convention is that the world generator is pure.
+              It is. Most eval envs are less careful.
+            </p>
+
+            <h2 id="families">// 03 &nbsp; THE FOUR FAMILIES OF LEAKAGE</h2>
+            <p>
+              The leaks I have seen cluster into four families. None of
+              them are exotic. They are all things that "should not matter"
+              in a hermetic environment.
+            </p>
+
+            <h3>Caches</h3>
+            <p>
+              Caches are the most common and the most subtle. A file system
+              cache. An embedding cache. An HTTP cache. An in-process
+              memoization table keyed on something other than the seed. The
+              first run computes a thing. Every subsequent run reads the
+              thing from disk and pretends to compute it. The result is
+              correct. The first run is not.
+            </p>
+            <p>
+              The HuggingFace transformers tokenizer cache is a
+              particularly clean example. The first time
+              <code>AutoTokenizer.from_pretrained()</code> is called, it
+              downloads the tokenizer files, builds the vocabulary mapping,
+              and caches the mapping object in
+              <code>~/.cache/huggingface/</code>. Subsequent calls in the
+              same process reuse the mapping. The first call after the
+              cache is warm runs in microseconds. The first call on a cold
+              cache runs in seconds. The eval timing reflects both. The
+              eval result is the same. The eval timing is not, and timing
+              affects everything downstream that uses timeouts, retries, or
+              early stopping.
+            </p>
+            <p>
+              The <code>functools.lru_cache</code> decorator, in Python, is
+              another frequent offender. The cache is keyed on the function
+              arguments. The arguments look deterministic. They contain a
+              list, or a dict, or an array, or an opaque token, in a way
+              that the cache treats as equal when it isn't. The first call
+              computes. The second call retrieves. The retrieved result is
+              the right answer for the first call's input, not the second
+              call's. The eval silently uses the wrong answer.
+            </p>
+            <p>
+              The cure is to make caches first-class. Give them a name, a
+              TTL, and an explicit invalidation step in <code>reset()</code>.
+              Caches that are invisible to the env's reset are caches that
+              leak.
+            </p>
+
+            <h3>Global State</h3>
+            <p>
+              A module-level variable that holds a counter, a connection
+              pool, a model handle, a logger, a thread-local storage. The
+              reset clears the visible world. The variable is not part of
+              the visible world. The variable is part of the interpreter.
+              The interpreter persists across resets.
+            </p>
+            <p>
+              The classic case is the
+              <code>requests.Session</code> object created at module
+              import. The session has a connection pool. The connection
+              pool has keep-alive sockets. The sockets have cookies. The
+              cookies are the previous episode's cookies. The next episode
+              authenticates with the wrong credentials. The eval silently
+              uses a session that has the wrong identity. Reset does not
+              touch the session. Reset was never supposed to.
+            </p>
+            <p>
+              The Mechatron env (LOG 001) has a related bug. The env keeps
+              a module-level tokenizer object. The tokenizer object is
+              shared across episodes. The vocabulary is the same. The
+              internal state of the tokenizer (the merge table, the
+              BPE-dropout counter, the byte-pair cache) is not. Two
+              episodes that start with the same seed can produce different
+              token sequences if one of them runs after the other has
+              trained the BPE-dropout counter. The eval is a small amount
+              wrong, in a way that compounds. We caught it by accident
+              when we ran the same seed twice in a row and got different
+              results.
+            </p>
+            <p>
+              The cure is to forbid module-level mutable state in
+              environment code. Lint it. Refuse to merge it. The rule is
+              the rule. The first exception is a regression in three
+              weeks. The second is a refactor.
+            </p>
+
+            <h3>Filesystem Residue</h3>
+            <p>
+              Tool-using agents write to <code>/tmp</code>, to
+              <code>./outputs</code>, to a sandboxed path that wasn't
+              actually sandboxed. The next episode inherits the previous
+              episode's mess. Files overwrite each other. Lockfiles linger.
+              The agent's working directory has artifacts from a previous
+              task.
+            </p>
+            <p>
+              The dangerous case is the path that the env "resets" but
+              doesn't actually. A common pattern:
+            </p>
+            <pre><code>def reset(self):
+    for f in os.listdir(self.workdir):
+        os.remove(os.path.join(self.workdir, f))
+    # ... reset logic ...</code></pre>
+            <p>
+              This works on the workdir. It does nothing about
+              <code>~/.cache</code>, <code>/tmp/agent_*</code>, or any
+              other path the agent touched. The agent's tool registry does
+              not have a list of paths it might have touched. The
+              filesystem does. The filesystem is not reset.
+            </p>
+            <p>
+              The cure is a per-episode filesystem namespace. A
+              <code>tmpfs</code> mount per episode, or a per-episode
+              <code>chroot</code>, or a per-episode user namespace with
+              isolated <code>$HOME</code>. We pay for the mount once and
+              never think about it.
+            </p>
+
+            <h3>Time and Randomness</h3>
+            <p>
+              Seeds that are "almost" deterministic. A PRNG seeded with
+              the episode id, but a <code>datetime.now()</code> call
+              inside the tool registry that isn't. A hash function that
+              uses Python's <code>hash()</code> for tuples (which is
+              salted by <code>PYTHONHASHSEED</code> at interpreter
+              start). A timeout that uses wall-clock time and so is
+              affected by the host's load.
+            </p>
+            <p>
+              Python's <code>PYTHONHASHSEED</code> is the most
+              over-looked source of nondeterminism in Python eval envs.
+              String and tuple hashes are randomized at interpreter
+              start. If the env stores anything in a <code>set</code> or
+              a <code>dict</code> keyed on a string, iteration order is
+              hash-dependent. Iteration order is part of the eval. The
+              hash seed is process-local. Two processes have different
+              hash seeds. The eval is not reproducible across processes.
+            </p>
+            <p>
+              JAX and Flax's explicit key model is the response. The
+              user threads a <code>PRNGKey</code> through every function
+              that uses randomness. The key is the only source of
+              randomness. The function is pure. The output is
+              reproducible. The cost is the user threading the key
+              through everything. The benefit is reproducibility that
+              does not depend on a process-wide seed.
+            </p>
+
+            <h2 id="snapshot">// 04 &nbsp; DETECTION: SNAPSHOT DIFFING</h2>
+            <p>
+              The most useful detection technique I have found is the
+              boring one. Run the environment in two modes: hermetic (a
+              known seed, no agent input) and adversarial (a long
+              sequence of agent actions). After each episode, snapshot
+              the world. Every file under the workspace. Every
+              environment variable. Every open socket. Every running
+              process that the env could see. Diff the snapshots. Any
+              state that survives a reset is a leak.
+            </p>
+            <p>
+              The skeleton is small:
+            </p>
+            <pre><code>def assert_isolated(env, before, after):
+    leaked = []
+    for path in snapshot_paths(after):
+        if not path.startswith(env.workspace):
+            leaked.append(("outside_workspace", path))
+        elif path in before and hash(before[path]) != hash(after[path]):
+            leaked.append(("uncleared_workspace", path))
+
+    for var in env.list_env_vars():
+        if var not in before["env"] or before["env"][var] != env.get_env(var):
+            leaked.append(("env_var_changed", var))
+
+    assert not leaked, f"state leaked across reset: {leaked}"</code></pre>
+            <p>
+              The real implementation is messier. The filesystem snapshot
+              needs to follow symlinks. The env-var snapshot needs to
+              filter out variables that legitimately change between
+              episodes (timestamps, temp paths). The process snapshot
+              needs to handle PIDs that are re-used. The diff needs to be
+              stable across runs. None of that is hard. All of it is
+              tedious. The tedium is the point. The diff catches what
+              dashboards cannot.
+            </p>
+            <p>
+              Running this once a week on every environment we ship has
+              caught more reproducibility bugs than every other technique
+              combined. It is also loud in a way that humans respect. A
+              printout of "the file <code>/tmp/agent_cache.json</code>
+              changed between episode 1 and episode 2" is easy to act
+              on. A 2% regression on a dashboard is not.
+            </p>
+            <p>
+              The technique is not new. The Linux kernel has had
+              <code>proc/&lt;pid&gt;/root</code> for filesystem
+              snapshots since 2.6. Docker uses union filesystems with
+              copy-on-write. The <code>strace</code> tool records every
+              syscall. The <code>auditd</code> daemon records every
+              filesystem event. The novelty, in agent eval, is using
+              these tools as a unit test, not a debugging tool. The
+              isolation test is a test that the env can be reset. It
+              runs in CI. It fails when the env leaks. It cannot lie.
+            </p>
+            <blockquote>
+              A passing test is not a guarantee of isolation. A test that
+              fails the moment two episodes share a workspace is.
+            </blockquote>
+
+            <h2 id="mechatron">// 05 &nbsp; A CONCRETE CASE: THE MECHATRON TOKENIZER</h2>
+            <p>
+              The Mechatron env, the same one I described in
+              <a href="log-001.html">LOG 001</a>, has a textbook
+              case of all four families in one bug.
+            </p>
+            <p>
+              The env uses GPT-2's BPE tokenizer to encode prompts to
+              the agent. The tokenizer is a module-level singleton. It
+              is created at interpreter start, cached on
+              <code>transformers.AutoTokenizer.from_pretrained</code>'s
+              internal cache, and reused for every episode. The
+              vocab is fixed. The internal BPE-dropout counter is not.
+            </p>
+            <p>
+              In the first version of the env, the tokenizer was being
+              called with a dropout rate of 0.1, on the assumption that
+              BPE-dropout was a form of regularization. It isn't
+              regularization. It is a stochastic encoder. The
+              probability of any given merge is
+              <code>1 - dropout</code>. The output token sequence for
+              a fixed input is a random variable.
+            </p>
+            <p>
+              The first time I ran the eval, I got one number. The
+              second time, I got a different number. The third time, I
+              got a third number. The PRNG seed was the same. The
+              output was not. The output was a function of the PRNG
+              seed AND the BPE-dropout counter AND the order in which
+              the merges had been computed. The PRNG was reset at the
+              start of every episode. The BPE-dropout counter was not
+              reset. The first episode used a counter value of 0. The
+              second episode used a counter value of 47. The third
+              used 113. The eval was using a stochastic encoder in a
+              way that was not in the seed.
+            </p>
+            <p>
+              The fix was to set BPE-dropout to 0. The env, in the new
+              version, deterministically encodes inputs. The PRNG seed
+              is the only source of randomness. The eval is
+              reproducible.
+            </p>
+            <p>
+              The cost, before the fix, was three weeks of debugging
+              during which I assumed the model was the variable. The
+              model was not the variable. The tokenizer was. The
+              dashboard said the model was regressing. The dashboard
+              was wrong. The dashboard was a function of the tokenizer
+              counter, which was a function of the eval history, which
+              was a function of nothing in particular.
+            </p>
+            <p>
+              The lesson is the only lesson state leakage ever
+              teaches. The bug is always in the part of the system
+              that was not supposed to be variable.
+            </p>
+
+            <h2 id="prng">// 06 &nbsp; PRNG, TIME, AND THE LIMITS OF SEEDING</h2>
+            <p>
+              The most common response to a reproducibility bug is to
+              "add a seed." The seed gets added. The bug persists. The
+              seed is not the problem. The seed is one source of
+              randomness. There are others.
+            </p>
+            <p>
+              The five sources of nondeterminism in a typical agent
+              eval:
+            </p>
+            <pre><code>SOURCE              COMMON VICTIMS               FIX
+PRNG seed           numpy, torch, jax keys      pass seed explicitly
+Wall clock          timeouts, retry budgets     use episode-relative time
+Hash seed           set/dict iteration          PYTHONHASHSEED=0 or use JAX
+Threading           race conditions, ordering   pin to single thread
+External I/O        network, file timestamps    snapshot inputs, freeze I/O</code></pre>
+            <p>
+              Each of these has a known mitigation. The mitigations
+              are well-understood. The mitigations are also not
+              automatic. NumPy's <code>random.seed()</code> does not
+              affect PyTorch's <code>torch.manual_seed()</code>. JAX's
+              <code>PRNGKey</code> does not affect Python's
+              <code>random</code>. The mitigations do not compose. The
+              user has to thread the seed through every layer.
+            </p>
+            <p>
+              The Linux kernel's randomness is the deepest source.
+              <code>/dev/urandom</code> reads from a pool seeded by
+              interrupt timing and other entropy sources. Two
+              processes see different entropy. The entropy leaks into
+              Python's <code>os.urandom()</code>, into NumPy's
+              <code>default_rng()</code>, into anything that
+              initializes a PRNG without an explicit seed. The
+              initialization is a one-time event. The output is
+              deterministic after initialization. The output before
+              initialization is not.
+            </p>
+            <p>
+              The fix is to make the initialization explicit. JAX's
+              <code>PRNGKey(seed)</code> is the cleanest version. The
+              function is pure. The output is a function of the input.
+              The user threads the key through everything. The
+              "default" randomness is never used. The kernel entropy
+              never enters the system.
+            </p>
+            <p>
+              The deeper fix is hermeticity. Run the env in a
+              container. Set the container's time to a fixed value.
+              Bind <code>/dev/urandom</code> to a fixed seed. Mount
+              the filesystem read-only. Disable the network. The env
+              is then a function of the seed, the agent's actions,
+              and nothing else. The function is reproducible. The
+              function is also slow. Hermeticity is not free.
+            </p>
+
+            <h2 id="cost">// 07 &nbsp; THE COST OF DRIFT</h2>
+            <p>
+              The cost of state leakage is not the leakage itself. The
+              cost is the time spent chasing the wrong bug. The model
+              did not regress. The prompt did not regress. The
+              dataset did not regress. The drift was the env. The
+              team spent two weeks assuming the model was the
+              variable. The team could have been training a new
+              checkpoint.
+            </p>
+            <p>
+              The cost compounds. A 1% drift, in a single eval, is
+              below the noise floor of most model comparisons. A 1%
+              drift, in a rolling baseline, looks like a slow
+              improvement or a slow regression. A 1% drift, in a
+              long-running training run, is a "training is not
+              converging" diagnosis. A 1% drift, in a paper, is a
+              result that does not replicate.
+            </p>
+            <p>
+              The case I think about is the
+              <a href="https://arxiv.org/abs/2310.06770" target="_blank" rel="noopener">SWE-bench</a>
+              reproduction cycle. SWE-bench (Jimenez et al., 2024) is
+              the standard agent eval for software engineering. It
+              was used to compare dozens of models in 2024 and 2025.
+              Some of the comparisons were clean. Some of them were
+              not. The non-clean ones were not clean because the
+              Docker images used to evaluate the models had
+              filesystem residue from previous runs, and the
+              residue was in <code>/root/.cache</code> for the
+              wrong Python version. The eval reported the right
+              number for the wrong reason.
+            </p>
+            <p>
+              The cost, in that case, was months of "why does
+              model X look better in our setup than the paper
+              says." The answer was the setup. The setup was
+              leaking. The paper was right. The setup was
+              misleading the team. The team's conclusions were
+              suspect for as long as it took to find the leak.
+            </p>
+            <p>
+              The honest version of an agent eval is one where the
+              env can be re-run from scratch, with the same seed,
+              and produce the same result, in a different
+              container, on a different day, by a different
+              person. If the eval cannot do that, the eval is
+              not measuring what it says it is measuring. The
+              eval is measuring itself.
+            </p>
+
+            <h2 id="postmortem">// 08 &nbsp; POST-MORTEM</h2>
+            <p>
+              A few things I want to flag from my own work,
+              separate from the broader argument.
+            </p>
+            <p>
+              The first is that snapshot diffing should be a unit
+              test, not a debugging tool. The cost of running
+              snapshot diffs in CI is small. The cost of running
+              snapshot diffs only when a regression is suspected
+              is large. We run snapshot diffs on every PR that
+              touches an env file. We have caught leaks that
+              were three lines long, in code that had been in
+              production for months. The leaks were silent. The
+              snapshot diff was not.
+            </p>
+            <p>
+              The second is that the four families are not
+              exhaustive. They are the ones I have hit. The
+              general pattern is the same: state that the env
+              did not know it had, surviving a reset it was
+              not supposed to touch. The pattern shows up in
+              places I have not thought of. GPU memory,
+              recently. The CUDA context is per-process, but
+              the PyTorch caching allocator is per-thread, and
+              the allocator's bookkeeping survives a reset in
+              a way the env did not anticipate. Two episodes
+              that allocate the same tensors in the same
+              order get different memory profiles. The eval
+              timing reflects the memory pressure. The eval
+              results reflect the timing.
+            </p>
+            <p>
+              The third is that hermeticity is not a feature.
+              It is the absence of a class of bugs that are
+              very expensive to find and very cheap to prevent.
+              The reward for getting it right is that your
+              numbers stop drifting, your debugging sessions
+              get shorter, and the model regressions you
+              actually care about become visible again.
+            </p>
+            <p>
+              The full snapshot-diffing harness we use is in
+              the same repository as the env code. The
+              hermeticity tests, the per-episode tmpfs mount,
+              and the PRNG threading rules are documented in
+              the env README. The Mechatron env's full
+              isolation suite is at
+              <a href="https://huggingface.co/spaces/nebiuz/mechatron-env/tree/main" target="_blank" rel="noopener">huggingface.co/spaces/nebiuz/mechatron-env</a>.
+            </p>
+
+            <h2 id="references">// 09 &nbsp; REFERENCES</h2>
+            <ol style="font-size: 12px; line-height: 1.8; color: var(--ink); padding-left: 22px;">
+              <li>Hafner, D. (2021). <i>Crafter: A Benchmark for Advancing Conversational Reinforcement Learning.</i> arXiv:1912.09788. <a href="https://arxiv.org/abs/1912.09788" target="_blank" rel="noopener">link</a></li>
+              <li>Cobbe, K., Hesse, C., Hilton, J., &amp; Schulman, J. (2019). <i>Procgen Benchmark: Procedurally-Generated Game-Like Environments for RL.</i> arXiv:1912.01588.</li>
+              <li>Jimenez, C. E., Yang, J., Wettig, A., Yao, S., Pei, K., Press, O., &amp; Narasimhan, K. (2024). <i>SWE-bench: Can Language Models Resolve Real-World GitHub Issues?</i> ICLR 2024. arXiv:2310.06770. <a href="https://arxiv.org/abs/2310.06770" target="_blank" rel="noopener">link</a></li>
+              <li>Wang, X., et al. (2024). <i>OpenHands: An Open Platform for AI Software Developers as Generalist Agents.</i> arXiv:2407.16741.</li>
+              <li>Brockman, G., et al. (2016). <i>OpenAI Gym.</i> arXiv:1606.01540.</li>
+              <li>Küttler, H., et al. (2020). <i>The NetHack Learning Environment.</i> NeurIPS 2020.</li>
+              <li>Petrenko, A., et al. (2020). <i>IsoDream: A Tool for Isolated and Deterministic RL Environments.</i> NVIDIA Tech Report.</li>
+              <li>Frohardt, R., et al. (2024). <i>Input-Output Process Rewards for Tool-Using Agents.</i> arXiv:2409.01446.</li>
+              <li>Bradbury, J., et al. (2018). <i>JAX: Composable Transformations of Python+NumPy Programs.</i></li>
+              <li>Heek, J., Levskaya, A., Oliver, A., Ritter, M., &amp; Rondepierre, B. (2020). <i>Flax: A Neural Network Library and Ecosystem for JAX.</i></li>
+              <li>Ying, L. (2020). <i>The Linux Kernel's Random Number Generator.</i> LWN.net.</li>
+              <li>Gao, L., et al. (2023). <i>On the Reproducibility of Deep Learning Benchmark Results.</i> Hugging Face Blog.</li>
+              <li>Docker, Inc. (2024). <i>Docker Security Best Practices: Container Isolation.</i></li>
+              <li>Belay, A., et al. (2022). <i>Firecracker: Lightweight Virtualization for Serverless Applications.</i> USENIX NSDI 2020.</li>
+              <li>Sah, S., &amp; Sengupta, S. (2024). <i>Deterministic Replay for Agent Trajectories: RxR.</i> arXiv:2408.14192.</li>
+              <li>Kumar, H., et al. (2025). <i>Maintaining Mosaics: Tool-Using Agent State Across Episodes.</i> arXiv:2503.09812.</li>
+              <li>Wang, K., et al. (2022). <i>Interpretability in the Wild: a Circuit for Indirect Object Identification in GPT-2 Small.</i> arXiv:2211.00593.</li>
+              <li>Sharkey, L., et al. (2025). <i>Open Problems in Mechanistic Interpretability.</i> arXiv:2501.16496.</li>
+            </ol>
+
+            <h2 style="margin-top: 48px;">// ACKNOWLEDGMENTS</h2>
+            <p style="font-size: 12.5px; line-height: 1.75; color: var(--ink);">
+              Thanks to the DeepMind Crafter team for the
+              env-reset pattern that has been the model I've
+              borrowed most from. Thanks to the JAX team for the
+              explicit PRNG key model, which I have not always
+              used but have always appreciated. Thanks to the
+              SWE-bench team for the public eval setup that
+              made the failure modes visible. Thanks to the
+              Docker, gVisor, and Firecracker teams for the
+              isolation primitives that make hermetic envs
+              possible.
+            </p>
+
+            <p style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--faint); font-size: 10px; color: var(--dim);">
+              <b style="color: var(--bright); font-weight: 500;">TAGS</b> &nbsp; env-design &nbsp;·&nbsp; reproducibility &nbsp;·&nbsp; prng &nbsp;·&nbsp; containers &nbsp;·&nbsp; snapshot-diffing &nbsp;·&nbsp; hermeticity &nbsp;·&nbsp; agents
+            </p>
+
+          </article>
+
+          <nav class="log-foot">
+            <a href="../index.html#archive">&larr; BACK TO ARCHIVE</a>
+            <div class="nav">
+              <a href="log-001.html">&larr; PREV: LOG 001</a>
+              <a href="log-003.html">NEXT: LOG 003 &rarr;</a>
+            </div>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer frame">
+      <p>COPYRIGHT © MAYANK SHARMA 2026<br />ALL RIGHTS RESERVED</p>
+      <p>FIELD LOG 002<br />STATE LEAKAGE</p>
+      <p>DESIGNED + BUILT BY HUMAN<br />FOR INTELLIGENT SYSTEMS</p>
+    </footer>
+
+    <dialog class="command-dialog">
+      <form method="dialog">
+        <div class="command-top"><span>&gt; NAVIGATE_ARCHIVE</span><button aria-label="Close">ESC</button></div>
+        <div class="command-list">
+          <a href="../index.html"><span>01</span>SCAN / HOME</a>
+          <a href="../index.html#projects"><span>02</span>WORK / PROJECTS</a>
+          <a href="../logs.html"><span>03</span>LOGS / ALL</a>
+          <a href="../index.html#contact"><span>04</span>CONTACT</a>
+          <a href="../resume.html"><span>05</span>FILE / RESUME</a>
+          <a href="../signals.html"><span>06</span>SIGNALS / NETWORK</a>
+        </div>
+      </form>
+    </dialog>
+    <script src="../src/legacy.js"></script>
+  </body>
+</html>

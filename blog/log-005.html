@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+      <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noimageindex, noarchive" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A benchmark that breaks every time you change a prompt is not a benchmark. It is a self-portrait of the moment you wrote it. The harness is the part you should over-engineer, because the harness is the part that has to outlive the model."
+    />
+    <title>LOG 005 // Eval Harness. Mayank Sharma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+<link rel="stylesheet" href="../styles.css" />
+    <script>document.addEventListener("contextmenu",function(e){var t=e.target;if(t&&t.tagName==="IMG"||t&&t.closest&&t.closest("img"))e.preventDefault()});</script>
+</head>
+  <body>
+    <header class="topbar frame">
+      <div>
+        <strong>MS ARCHIVE SYSTEM 1.0</strong>
+        <span>build: 05.31.26</span>
+      </div>
+      <p>FIELD LOG <br />EVAL HARNESS</p>
+      <div class="system-state"><i></i> SYSTEM STATUS: ONLINE</div>
+    </header>
+
+    <main>
+      <section class="post">
+        <aside class="axis axis-left"><span>LOG 005 / 007</span></aside>
+        <div class="intro">
+          <p class="eyebrow">FIELD LOG <span>//</span> EVAL HARNESS</p>
+          <h1 style="margin-top:14px;">WRITING EVAL<br />HARNESSES<br />THAT SURVIVE<br />A REFACTOR <b>_</b></h1>
+          <p class="lede">
+            A benchmark that breaks every time you change a prompt is
+            not a benchmark. It is a self-portrait of the moment you
+            wrote it. Treat the harness like a compiler: deterministic
+            inputs, deterministic outputs, a stable interface to the
+            system under test. The day the model changes should not be
+            the day the numbers change meaning.
+          </p>
+          <div class="post-meta">
+            <span><b>READ TIME</b> &nbsp; 30M</span>
+            <span><b>POSTED</b> &nbsp; 05.31.26</span>
+            <span><b>RUN</b> &nbsp; 5c20-7e88</span>
+            <span><b>STATUS</b> &nbsp; PUBLISHED</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="../assets/blog-eval-harness.svg" alt=""  draggable="false" ondragstart="return false;" />
+          <div class="image-meta">
+            <span>REC_005</span><span>SUBJECT: BENCH STABILITY</span><span>CHANNEL: EVAL</span>
+          </div>
+        </div>
+        <aside class="axis axis-right"><span>TIME: <em data-clock>00:00:00</em> GMT</span></aside>
+      </section>
+
+      <section class="log-body">
+        <div class="log-shell">
+          <div class="crumbs">
+            <a href="../index.html">// HOME</a>
+            <span>/</span>
+            <a href="../index.html#archive">/ ARCHIVE</a>
+            <span>/</span>
+            <span>LOG 005</span>
+          </div>
+
+          <header class="log-head">
+            <div class="log-id">LOG 005 <span>EVAL / HARNESS DESIGN / CI / CALIBRATION</span></div>
+            <h1>Writing Eval Harnesses That Survive a Refactor</h1>
+            <p class="log-deck">
+              The eval harness is the part of the system that decides
+              whether the things you ship are actually getting better
+              or whether you are just convincing yourself they are.
+              This post is about the three layers every harness needs,
+              the manifest that makes a run reproducible, the anchor
+              runs that catch silent regressions, and the discipline
+              that makes the rest of the numbers worth looking at.
+            </p>
+            <div class="log-stats">
+              <span><b>READ</b> &nbsp; 30M</span>
+              <span><b>FILED</b> &nbsp; 05.31.26</span>
+              <span><b>TAGS</b> &nbsp; eval, benchmarks, harness, ci, calibration, contamination</span>
+              <span><b>RUN</b> &nbsp; 12 tasks / 4 anchor models / weekly cadence</span>
+            </div>
+          </header>
+
+          <article class="prose">
+            <nav class="toc" style="margin: 0 0 36px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11.5px; line-height: 1.9; color: var(--ink);">
+              <p style="margin: 0 0 8px; color: var(--bright); font-size: 10px; letter-spacing: .05em;">// TABLE OF CONTENTS</p>
+              <a href="#number" style="display:block; color: var(--ink);">01 &nbsp; The Number That Wasn't</a>
+              <a href="#layers" style="display:block; color: var(--ink);">02 &nbsp; The Three Layers</a>
+              <a href="#manifest" style="display:block; color: var(--ink);">03 &nbsp; Frozen Manifests</a>
+              <a href="#calibration" style="display:block; color: var(--ink);">04 &nbsp; Calibration Runs</a>
+              <a href="#scorer" style="display:block; color: var(--ink);">05 &nbsp; When the Scorer Is Wrong</a>
+              <a href="#contamination" style="display:block; color: var(--ink);">06 &nbsp; Contamination</a>
+              <a href="#capability" style="display:block; color: var(--ink);">07 &nbsp; Capability vs Alignment Evals</a>
+              <a href="#postmortem" style="display:block; color: var(--ink);">08 &nbsp; Post-Mortem</a>
+              <a href="#references" style="display:block; color: var(--ink);">09 &nbsp; References</a>
+            </nav>
+
+            <h2 id="number">// 01 &nbsp; THE NUMBER THAT WASN'T</h2>
+            <p class="drop">
+              The model changed on a Tuesday. The benchmark ran on a
+              Wednesday. The number went up. The number going up was
+              not the surprise. The surprise was that nobody could
+              tell whether the number going up meant the model got
+              better or the benchmark got easier. The prompt had
+              been edited the week before. Two tasks had been
+              "slightly simplified" by an engineer who had since left
+              the team. A scorer had been "fixed" six weeks earlier
+              and never re-validated. By Wednesday, the harness was
+              measuring a different thing than it had been measuring
+              on Monday. We had a number. We did not have a result.
+            </p>
+            <p>
+              The interesting thing about this kind of failure is that
+              it is invisible in the moment. The benchmark runs. The
+              number comes out. The number is higher than last week's
+              number. The model shipped an update. The update looks
+              better. Everyone is happy. The regression is six months
+              away, when someone asks "wait, when did the benchmark
+              start measuring <i>that</i>?" and the answer is "we
+              don't know, it's been months."
+            </p>
+            <p>
+              The pattern is not unique to our team. It is the
+              default failure mode of any eval suite that has been
+              alive for more than a year. The suite accretes
+              changes. The changes are small. The changes are
+              reasonable in isolation. The changes compose into
+              something that is no longer the thing you set out to
+              measure. The composition is invisible because the
+              suite does not have a manifest. The suite has a
+              number. The number is a story you are telling yourself.
+            </p>
+            <p>
+              The fix is a harness with a manifest, with frozen
+              layers, and with anchor runs that catch silent drift.
+              The fix is not glamorous. The fix is mostly
+              bookkeeping. The fix is the part of the system that
+              does not ship to users. The fix is the part that
+              decides whether the things you ship are actually
+              getting better.
+            </p>
+
+            <h2 id="layers">// 02 &nbsp; THE THREE LAYERS</h2>
+            <p>
+              A good eval harness has three layers, and they should
+              be versioned independently. The first is the task
+              suite: the inputs (questions, contexts, ground-truth
+              outputs) and the scoring rubric. The second is the
+              runner: the plumbing that invokes the system under
+              test, collects outputs, and handles retries and
+              timeouts. The third is the scorer: the grading logic
+              that turns outputs into numbers.
+            </p>
+            <p>
+              The three layers have different change cadences. The
+              task suite changes when you add a task, remove a
+              task, or fix a task that was wrong. The runner
+              changes when you fix a bug in the harness, switch a
+              retry policy, or update a dependency. The scorer
+              changes when you change what "correct" means. The
+              changes are not independent in intent, but they
+              should be independent in versioning. A change to the
+              scorer should not touch a line of the task suite. A
+              change to the runner should not touch a line of the
+              scorer.
+            </p>
+            <p>
+              The implementation is three repos. We have a
+              <code>tasks</code> repo (the task suite), a
+              <code>runner</code> repo (the plumbing), and a
+              <code>scorers</code> repo (the grading). Each has
+              its own CI. Each has its own test suite. Each has
+              its own versioning. An experiment pins a commit
+              from each repo, plus the model id, plus the prompt
+              template, plus the runner environment. The
+              combination is the manifest. The manifest is the
+              reproducibility.
+            </p>
+            <p>
+              The alternative is a single repo with a
+              <code>/tasks</code>, <code>/runner</code>,
+              <code>/scorers</code> directory structure. The
+              alternative is simpler in tooling, but the layers
+              are coupled by the repo. A change to the runner
+              requires a PR that touches the runner. A change to
+              the scorer requires a PR that touches the scorer.
+              The coupling is fine if the team is small. The
+              coupling becomes friction when the team grows.
+            </p>
+
+            <h2 id="manifest">// 03 &nbsp; FROZEN MANIFESTS</h2>
+            <p>
+              Every experiment gets a frozen manifest. The manifest
+              pins the exact commit of the task suite, the exact
+              commit of the scorer, the exact model id and provider
+              version, the exact prompt template, and a hash of
+              the runner's environment. The manifest is stored
+              alongside the result. Six months later, when someone
+              asks "what was the model doing at that 41.2%
+              number," you can reproduce the exact run, including
+              the bug that you only noticed afterwards.
+            </p>
+            <pre><code>run_manifest = {
+    "task_suite": pin("git+ssh://eval/tasks.git@a1b2c3"),
+    "scorer":     pin("git+ssh://eval/scorers.git@4d5e6f"),
+    "model":      {"provider": "anthropic", "id": "claude-opus-4-7", "rev": "2025-11-20"},
+    "prompt":     sha256_file("prompts/main.j2"),
+    "env":        sha256_file("requirements.lock"),
+}
+write_manifest(run_manifest, path=f"runs/{run_id}.json")</code></pre>
+            <p>
+              The manifest is the part of the system that should
+              never be edited after the run. The result is a
+              function of the manifest. The manifest is the input
+              to the function. The function is the run. The
+              result is the output. The output is meaningless
+              without the input. The manifest is the input.
+            </p>
+            <p>
+              The manifest also makes audits possible. A
+              regulator asks "what was your model doing on March
+              14, 2026?" The answer is a manifest. The manifest
+              pins the task suite, the scorer, the model, the
+              prompt, the environment. The answer is reproducible.
+              The answer is auditable. The answer is the
+              difference between a model you can deploy in a
+              regulated context and a model you cannot.
+            </p>
+            <p>
+              The implementation is small. A
+              <code>write_manifest</code> function that takes a
+              dict and writes it to a file. A
+              <code>read_manifest</code> function that reads it
+              back. A convention that every run directory
+              contains a <code>manifest.json</code>. A CI check
+              that fails the build if a result is written
+              without a manifest. The cost is bookkeeping. The
+              benefit is reproducibility.
+            </p>
+
+            <h2 id="calibration">// 04 &nbsp; CALIBRATION RUNS</h2>
+            <p>
+              On a fixed cadence (weekly, in our case) we run the
+              full harness against a small set of anchor models
+              that we never ship with. The anchors are cheap,
+              slow-changing, and well understood. GPT-3.5-turbo
+              is one. Claude Instant is another. Llama-3-8B is a
+              third. The anchor suite is the same task suite
+              with the same scorer. The model is the only thing
+              that changes.
+            </p>
+            <p>
+              If an anchor's number moves by more than a
+              configured delta (we use 0.5 absolute percentage
+              points), we investigate before we trust any of the
+              other numbers. The investigation is almost always
+              one of three things: a silent scorer regression, a
+              prompt-template change, or a provider-side update
+              that nobody told us about. We caught a Claude
+              prompt-cache change this way in November 2025.
+              Without the anchor, we would have shipped a
+              "regression" that wasn't.
+            </p>
+            <p>
+              The anchors are not perfect. They are subject to
+              the same provider-side changes as the models we
+              ship with. The difference is that we have years of
+              anchor data. We know what the anchor's number
+              should be. We know what the variance should be.
+              A 0.5-point move is a signal. A 0.1-point move is
+              noise. A 2-point move is an investigation. The
+              thresholds are calibrated to the anchor's history.
+              The thresholds are not transferable to other
+              models. Each anchor has its own threshold.
+            </p>
+            <p>
+              The cost is real. Running an anchor suite weekly
+              is a small but non-zero line item. The benefit is
+              that the rest of the numbers are worth looking at.
+              That is the trade, and most teams do not make it.
+              Most teams run the eval suite when they ship a
+              model, see a number, and ship. The number is a
+              story. The anchor is the only way to know whether
+              the story is true.
+            </p>
+
+            <h2 id="scorer">// 05 &nbsp; WHEN THE SCORER IS WRONG</h2>
+            <p>
+              You will discover, with non-trivial frequency, that
+              the scorer is wrong. A task that should have been
+              marked correct is marked wrong, or vice versa. The
+              failure modes are predictable. The scorer compares
+              a normalized string and a regex matches
+              "<i>nope</i>" to "<i>nope.</i>" with the
+              difference being a trailing period. The scorer
+              compares a numeric answer and rounds 0.499 to 0
+              when the answer is 0.5. The scorer parses a JSON
+              output and fails on a trailing comma. The scorer
+              is a program. The program has bugs.
+            </p>
+            <p>
+              The right move is almost never to fix the scorer
+              and keep going. The right move is:
+            </p>
+            <ol>
+              <li>Mark the affected run ids as
+                <code>scorer_bug</code> in the manifest.</li>
+              <li>Re-run them with the corrected scorer and a
+                frozen task suite.</li>
+              <li>Compare the new number to the old. If the
+                delta is small, you are done. If the delta is
+                large, write up what happened.</li>
+            </ol>
+            <p>
+              The writeup matters. Future-you will thank
+              present-you. The next person who joins the team
+              will not have to reverse-engineer why a number is
+              what it is. The writeup is the institutional
+              memory of the eval suite. The institutional memory
+              is the part that does not survive a team
+              transition. The writeup is how you make it
+              survive.
+            </p>
+            <p>
+              The discipline of "mark, re-run, compare" is
+              what separates a harness from a number generator.
+              The harness is a system that can be inspected,
+              audited, and reproduced. The number generator is
+              a script that produces a number. The number is
+              the same in both cases. The system is different.
+              The system is what matters.
+            </p>
+
+            <h2 id="contamination">// 06 &nbsp; CONTAMINATION</h2>
+            <p>
+              The single hardest problem in eval is contamination.
+              A model is trained on a corpus. The eval suite is
+              a dataset. If the dataset is in the corpus, the
+              model has seen the answers. The model is not
+              "solving" the task. The model is recalling the
+              answer. The eval is not measuring capability. The
+              eval is measuring recall. The two are not the same.
+            </p>
+            <p>
+              The standard mitigations are well-known. Held-out
+              test sets. Dynamic benchmarks where the questions
+              are generated at eval time. Private benchmarks
+              that are not released publicly. Multiple-choice
+              questions with randomized answer orders. None of
+              the mitigations are perfect. All of the
+              mitigations are necessary.
+            </p>
+            <p>
+              <a href="https://arxiv.org/abs/2009.03300" target="_blank" rel="noopener">GSM8K</a>
+              (Cobbe et al., 2021) was a good benchmark for
+              about six months. By 2023, every frontier model
+              was scoring above 90%. The benchmark was either
+              trivial or contaminated. Probably both.
+              <a href="https://arxiv.org/abs/2412.04035" target="_blank" rel="noopener">MATH</a>
+              (Hendrycks et al., 2021) went the same way.
+              <a href="https://arxiv.org/abs/2009.03300" target="_blank" rel="noopener">HumanEval</a>
+              (Chen et al., 2021) is now saturated for
+              production-sized models. The benchmarks that
+              survive contamination are the ones that get
+              refreshed. The benchmarks that do not get
+              refreshed die.
+            </p>
+            <p>
+              Our strategy is two-pronged. The first prong is
+              to maintain a private eval suite that is never
+              released. The private suite has roughly 2,000
+              tasks, refreshed quarterly. The refresh is
+              expensive (a few engineer-weeks per cycle) but
+              the suite is the most trusted signal we have. The
+              second prong is to use public benchmarks with a
+              clear eye on their saturation. A benchmark that
+              every model scores 95% on is not measuring what
+              it used to measure. We deprecate saturated
+              benchmarks from our internal leaderboard. The
+              deprecation is documented. The deprecation is the
+              answer to "why did you stop reporting this
+              number?"
+            </p>
+            <p>
+              The deeper problem is that contamination is
+              asymmetric. The model trains on the corpus. The
+              eval suite is part of the corpus, by accident or
+              by design. The model does not know which parts of
+              its training data are "the test." The eval suite
+              does not know which parts of the model's training
+              data are "the answers." The two are coupled in a
+              way that neither side can fully characterize. The
+              coupling is the limit of what any benchmark can
+              tell you about a model's capability.
+            </p>
+
+            <h2 id="capability">// 07 &nbsp; CAPABILITY VS ALIGNMENT EVALS</h2>
+            <p>
+              Capability evals and alignment evals are
+              different systems. They measure different things.
+              They have different failure modes. They require
+              different harnesses.
+            </p>
+            <p>
+              Capability evals ask "can the model do X." The
+              answer is a number. The number is reproducible.
+              The number is comparable across models. The
+              number is what gets reported in leaderboards. The
+              number is what gets used in marketing. The number
+              is, in the limit, what determines whether a
+              model ships.
+            </p>
+            <p>
+              Alignment evals ask "does the model do X when it
+              shouldn't." The answer is a rate. The rate is the
+              number of times the model did X out of the number
+              of times it was asked. The rate is harder to
+              reproduce. The rate depends on the prompt
+              distribution. The prompt distribution is a
+              modeling choice. The modeling choice is a
+              research decision. The research decision is
+              load-bearing.
+            </p>
+            <p>
+              A capability eval can be graded by a Python
+              function (see <a href="log-001.html">LOG 001</a>
+              on verifiable rewards). An alignment eval cannot.
+              An alignment eval requires a judge, and the
+              judge is a model (or a human, or a model
+              reviewed by a human), and the judge has biases
+              (see <a href="log-001.html">LOG 001</a> on
+              position and length bias). The biases are
+              measurable. The biases are not eliminable. The
+              biases are part of the number.
+            </p>
+            <p>
+              The harness for an alignment eval must therefore
+              include the judge's bias report. The report is
+              part of the manifest. The report is the audit
+              trail. The audit trail is the difference between
+              a claim of "our model is 95% safe" and a
+              defensible claim of "our model is 95% safe on
+              the red-team distribution, judged by
+              Claude-Sonnet-4.5, with a 3% position bias and a
+              2% length bias, corrected for both." The first
+              claim is a story. The second claim is a result.
+              The harness is the difference.
+            </p>
+
+            <h2 id="postmortem">// 08 &nbsp; POST-MORTEM</h2>
+            <p>
+              A few things I want to flag from our own work.
+              The first is that the harness is the part of the
+              system that needs the most care, and the part
+              that gets the least, because it is the part that
+              does not ship to users. The "doesn't ship"
+              property is the trap. The harness is the part
+              that decides whether the things that ship are
+              actually getting better. The asymmetry between
+              visibility and importance is the whole problem
+              with eval, and the harness is the only answer I
+              have found.
+            </p>
+            <p>
+              The second is that contamination is a moving
+              target. A benchmark that is fresh today is
+              contaminated in six months. The refresh cadence
+              is the only sustainable defense. The refresh is
+              expensive. The refresh is necessary. The
+              alternative is a leaderboard full of 99% numbers
+              that nobody trusts.
+            </p>
+            <p>
+              The third is that the anchor runs are the most
+              under-rated part of the system. The anchors are
+              the part that catches the silent regressions.
+              The silent regressions are the part that
+              destroys trust in the eval suite. The trust is
+              the part that determines whether anyone
+              believes the numbers. The anchors are the
+              foundation. The foundation is unglamorous. The
+              foundation is necessary.
+            </p>
+            <p>
+              The eval harness, the manifest format, the
+              anchor suite, and the contamination writeup
+              are documented in the eval-systems repo. The
+              full source, the calibration schedules, and
+              the private benchmark refresh process are at
+              <a href="https://huggingface.co/spaces/nebiuz/eval-systems" target="_blank" rel="noopener">huggingface.co/spaces/nebiuz/eval-systems</a>.
+              The harness builds on the lm-evaluation-harness
+              design, the HELM methodology, and the
+              OpenAI Evals framework, with the
+              contamination discipline of
+              <a href="https://arxiv.org/abs/2406.01574" target="_blank" rel="noopener">LiveBench</a>
+              and the manifest pattern of the
+              <a href="https://github.com/EleutherAI/lm-evaluation-harness" target="_blank" rel="noopener">EleutherAI evaluation harness</a>.
+            </p>
+
+            <h2 id="references">// 09 &nbsp; REFERENCES</h2>
+            <ol style="font-size: 12px; line-height: 1.8; color: var(--ink); padding-left: 22px;">
+              <li>Gao, L., et al. (2024). <i>The Language Model Evaluation Harness.</i> Zenodo. arXiv:2406.01574. <a href="https://github.com/EleutherAI/lm-evaluation-harness" target="_blank" rel="noopener">link</a></li>
+              <li>Liang, P., et al. (2022). <i>Holistic Evaluation of Language Models (HELM).</i> Stanford CRFM. <a href="https://crfm.stanford.edu/helm/" target="_blank" rel="noopener">link</a></li>
+              <li>Srivastava, A., et al. (2022). <i>BIG-Bench: Beyond the Imitation Game.</i> arXiv:2206.04615.</li>
+              <li>Hendrycks, D., et al. (2020). <i>Measuring Massive Multitask Language Understanding (MMLU).</i> arXiv:2009.03300. <a href="https://arxiv.org/abs/2009.03300" target="_blank" rel="noopener">link</a></li>
+              <li>Hendrycks, D., et al. (2021). <i>MATH: Measuring Mathematical Problem Solving.</i> arXiv:2103.03874.</li>
+              <li>Cobbe, K., et al. (2021). <i>Training Verifiers to Solve Math Word Problems (GSM8K).</i> arXiv:2110.14168. <a href="https://arxiv.org/abs/2110.14168" target="_blank" rel="noopener">link</a></li>
+              <li>Chen, M., et al. (2021). <i>Evaluating Large Language Models Trained on Code (HumanEval).</i> arXiv:2107.03374.</li>
+              <li>Jimenez, C. E., et al. (2024). <i>SWE-bench: Can Language Models Resolve Real-World GitHub Issues?</i> ICLR 2024. arXiv:2310.06770.</li>
+              <li>White, C., et al. (2024). <i>LiveBench: A Challenging, Contamination-Free LLM Benchmark.</i> arXiv:2406.01574. <a href="https://arxiv.org/abs/2406.01574" target="_blank" rel="noopener">link</a></li>
+              <li>Pineau, J., et al. (2021). <i>Improving Reproducibility in Machine Learning Research (A Report from the NeurIPS 2019 Reproducibility Program).</i> JMLR 22.</li>
+              <li>Wang, X., et al. (2024). <i>OpenHands: An Open Platform for AI Software Developers as Generalist Agents.</i> arXiv:2407.16741.</li>
+              <li>OpenAI. (2024). <i>Evals Framework Documentation.</i> <a href="https://github.com/openai/evals" target="_blank" rel="noopener">link</a></li>
+              <li>Beeching, E., et al. (2023). <i>Open LLM Leaderboard.</i> Hugging Face. <a href="https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard" target="_blank" rel="noopener">link</a></li>
+              <li>Lambert, N., et al. (2024). <i>Tulu 3: Pushing Frontiers in Open Language Model Post-Training.</i> arXiv:2411.15124.</li>
+              <li>DeepSeek-AI. (2025). <i>DeepSeek-R1: Incentivizing Reasoning Capability in LLMs.</i> arXiv:2501.12948.</li>
+              <li>Zheng, L., et al. (2023). <i>Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.</i> NeurIPS 2023.</li>
+              <li>Rein, D., et al. (2023). <i>GPQA: A Graduate-Level Google-Proof Q&amp;A Benchmark.</i> arXiv:2311.12022.</li>
+              <li>Wang, Y., et al. (2024). <i>MMLU-Pro: A More Robust and Challenging Multi-Task Language Understanding Benchmark.</i> NeurIPS 2024.</li>
+            </ol>
+
+            <h2 style="margin-top: 48px;">// ACKNOWLEDGMENTS</h2>
+            <p style="font-size: 12.5px; line-height: 1.75; color: var(--ink);">
+              The harness design draws on a long lineage of
+              eval systems. The task / runner / scorer
+              separation follows the EleutherAI
+              lm-evaluation-harness design. The holistic
+              multi-metric framing follows the HELM
+              methodology. The contamination discipline
+              follows the LiveBench approach. The manifest
+              pattern follows the broader ML reproducibility
+              literature. The "number plus the conditions that
+              produced it" framing is a synthesis of all of
+              the above. The capability / alignment split
+              follows the standard taxonomy in the alignment
+              literature. The anchor-suite discipline is the
+              one piece I have not seen described in print
+              before, though it may be in use elsewhere. If
+              someone has written it up, I'd like to know.
+            </p>
+
+            <p style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--faint); font-size: 10px; color: var(--dim);">
+              <b style="color: var(--bright); font-weight: 500;">TAGS</b> &nbsp; eval &nbsp;·&nbsp; benchmarks &nbsp;·&nbsp; harness &nbsp;·&nbsp; ci &nbsp;·&nbsp; calibration &nbsp;·&nbsp; contamination &nbsp;·&nbsp; reproducibility &nbsp;·&nbsp; alignment
+            </p>
+
+          </article>
+
+          <nav class="log-foot">
+            <a href="../index.html#archive">&larr; BACK TO ARCHIVE</a>
+            <div class="nav">
+              <a href="log-004.html">&larr; PREV: LOG 004</a>
+              <a href="log-006.html">NEXT: LOG 006 &rarr;</a>
+            </div>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer frame">
+      <p>COPYRIGHT © MAYANK SHARMA 2026<br />ALL RIGHTS RESERVED</p>
+      <p>FIELD LOG 005<br />EVAL HARNESS</p>
+      <p>DESIGNED + BUILT BY HUMAN<br />FOR INTELLIGENT SYSTEMS</p>
+    </footer>
+
+    <dialog class="command-dialog">
+      <form method="dialog">
+        <div class="command-top"><span>&gt; NAVIGATE_ARCHIVE</span><button aria-label="Close">ESC</button></div>
+        <div class="command-list">
+          <a href="../index.html"><span>01</span>SCAN / HOME</a>
+          <a href="../index.html#projects"><span>02</span>WORK / PROJECTS</a>
+          <a href="../logs.html"><span>03</span>LOGS / ALL</a>
+          <a href="../index.html#contact"><span>04</span>CONTACT</a>
+          <a href="../resume.html"><span>05</span>FILE / RESUME</a>
+          <a href="../signals.html"><span>06</span>SIGNALS / NETWORK</a>
+        </div>
+      </form>
+    </dialog>
+    <script src="../src/legacy.js"></script>
+  </body>
+</html>

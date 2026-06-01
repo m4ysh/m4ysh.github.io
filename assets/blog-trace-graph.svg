@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="g" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M24 0H0V24" fill="none" stroke="#a9bec1" stroke-opacity=".06" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="flame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d2e0df" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#6f8587" stop-opacity=".25"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" fill="#0a1011"/>
+  <rect width="800" height="500" fill="url(#g)"/>
+
+  <g font-family="ui-monospace, monospace" fill="#a9bec1">
+    <text x="32" y="34" font-size="11" fill-opacity=".55" letter-spacing="2">REC_006 // TRACE GRAPH</text>
+    <text x="32" y="50" font-size="9" fill-opacity=".4" letter-spacing="1">AGENT STEP DAG + WATERFALL / RUN a8f2-9c4e</text>
+    <text x="768" y="34" font-size="9" fill-opacity=".35" text-anchor="end" letter-spacing="1">SPANS: 18 / RETRIES: 4</text>
+    <text x="768" y="50" font-size="9" fill-opacity=".35" text-anchor="end" letter-spacing="1">WALL: 2.84s</text>
+
+    <g font-size="8" fill-opacity=".35" text-anchor="middle">
+      <text x="80" y="74">0ms</text>
+      <text x="180" y="74">400</text>
+      <text x="280" y="74">800</text>
+      <text x="380" y="74">1200</text>
+      <text x="480" y="74">1600</text>
+      <text x="580" y="74">2000</text>
+      <text x="680" y="74">2400</text>
+      <text x="740" y="74">2800</text>
+    </g>
+    <g stroke="#a9bec1" stroke-opacity=".1">
+      <line x1="80" y1="80" x2="80" y2="280"/>
+      <line x1="180" y1="80" x2="180" y2="280"/>
+      <line x1="280" y1="80" x2="280" y2="280"/>
+      <line x1="380" y1="80" x2="380" y2="280"/>
+      <line x1="480" y1="80" x2="480" y2="280"/>
+      <line x1="580" y1="80" x2="580" y2="280"/>
+      <line x1="680" y1="80" x2="680" y2="280"/>
+    </g>
+
+    <g>
+      <g stroke="#a9bec1" stroke-opacity=".25" stroke-width="1" fill="none">
+        <path d="M120 110 L220 110"/>
+        <path d="M260 110 L360 110 L360 90 L420 90"/>
+        <path d="M460 90 L540 110 L580 110"/>
+        <path d="M260 110 L360 130 L360 150 L420 150"/>
+        <path d="M460 150 L540 110"/>
+        <path d="M620 110 L700 110"/>
+        <path d="M460 150 L540 200 L580 200"/>
+        <path d="M620 200 L700 200"/>
+        <path d="M580 200 L620 200"/>
+        <path d="M540 200 L540 240"/>
+        <path d="M580 240 L640 240"/>
+        <path d="M660 240 L720 240"/>
+      </g>
+
+      <g>
+        <rect x="80" y="98" width="40" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="100" y="113" font-size="9" fill="#d2e0df" text-anchor="middle">PARSE</text>
+        <text x="100" y="135" font-size="7" fill-opacity=".4" text-anchor="middle">42ms</text>
+      </g>
+      <g>
+        <rect x="220" y="98" width="40" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="240" y="113" font-size="9" fill="#d2e0df" text-anchor="middle">PLAN</text>
+        <text x="240" y="135" font-size="7" fill-opacity=".4" text-anchor="middle">188ms</text>
+      </g>
+      <g>
+        <rect x="360" y="78" width="60" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="390" y="93" font-size="9" fill="#d2e0df" text-anchor="middle">TOOL.SEARCH</text>
+        <text x="390" y="115" font-size="7" fill-opacity=".4" text-anchor="middle">612ms</text>
+      </g>
+      <g>
+        <rect x="360" y="138" width="60" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="390" y="153" font-size="9" fill="#d2e0df" text-anchor="middle">TOOL.FETCH</text>
+        <text x="390" y="175" font-size="7" fill-opacity=".4" text-anchor="middle">240ms</text>
+      </g>
+      <g>
+        <rect x="540" y="98" width="40" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="560" y="113" font-size="9" fill="#d2e0df" text-anchor="middle">OBSERVE</text>
+        <text x="560" y="135" font-size="7" fill-opacity=".4" text-anchor="middle">96ms</text>
+      </g>
+      <g>
+        <rect x="620" y="98" width="80" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="660" y="113" font-size="9" fill="#d2e0df" text-anchor="middle">LLM.GEN</text>
+        <text x="660" y="135" font-size="7" fill-opacity=".4" text-anchor="middle">820ms</text>
+      </g>
+      <g>
+        <rect x="540" y="188" width="40" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="560" y="203" font-size="9" fill="#d2e0df" text-anchor="middle">RECOVER</text>
+        <text x="560" y="225" font-size="7" fill-opacity=".4" text-anchor="middle">412ms</text>
+      </g>
+      <g>
+        <rect x="620" y="188" width="80" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="660" y="203" font-size="9" fill="#d2e0df" text-anchor="middle">RETRY×2</text>
+        <text x="660" y="225" font-size="7" fill-opacity=".4" text-anchor="middle">1.04s</text>
+      </g>
+      <g>
+        <rect x="620" y="228" width="40" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="640" y="243" font-size="9" fill="#d2e0df" text-anchor="middle">RESP</text>
+      </g>
+      <g>
+        <rect x="680" y="228" width="40" height="24" fill="#0a1011" stroke="#d2e0df" stroke-width="1.2"/>
+        <text x="700" y="243" font-size="9" fill="#d2e0df" text-anchor="middle">DONE</text>
+      </g>
+
+      <g fill="#d2e0df" fill-opacity=".9">
+        <polygon points="220,110 212,106 212,114"/>
+        <polygon points="420,90 412,86 412,94"/>
+        <polygon points="420,150 412,146 412,154"/>
+        <polygon points="540,110 532,106 532,114"/>
+        <polygon points="540,150 532,146 532,154"/>
+        <polygon points="700,110 692,106 692,114"/>
+        <polygon points="580,200 572,196 572,204"/>
+        <polygon points="700,200 692,196 692,204"/>
+        <polygon points="620,240 612,236 612,244"/>
+        <polygon points="720,240 712,236 712,244"/>
+      </g>
+
+      <g stroke="#d2e0df" stroke-width="1" fill="none" stroke-opacity=".7">
+        <path d="M380 175 C380 188 380 188 380 188" />
+      </g>
+      <g fill="#a9bec1" font-size="7" fill-opacity=".5">
+        <text x="478" y="120">✓</text>
+        <text x="478" y="160">↻</text>
+        <text x="478" y="220">↻</text>
+      </g>
+    </g>
+
+    <g>
+      <text x="32" y="296" font-size="9" fill-opacity=".45" letter-spacing="1">WATERFALL</text>
+
+      <g fill="#0a1011" stroke="#a9bec1" stroke-opacity=".35" stroke-width="1">
+        <rect x="80" y="304" width="14" height="10"/>
+        <rect x="80" y="318" width="38" height="10"/>
+        <rect x="80" y="332" width="120" height="10"/>
+        <rect x="80" y="346" width="58" height="10"/>
+        <rect x="80" y="360" width="12" height="10"/>
+        <rect x="98" y="318" width="6" height="10"/>
+        <rect x="138" y="332" width="6" height="10"/>
+        <rect x="146" y="332" width="6" height="10"/>
+        <rect x="160" y="360" width="6" height="10"/>
+        <rect x="170" y="360" width="6" height="10"/>
+      </g>
+      <g font-size="7" fill-opacity=".45">
+        <text x="210" y="312">parse.lex</text>
+        <text x="124" y="326">plan.decompose</text>
+        <text x="206" y="340">tool.search</text>
+        <text x="144" y="354">tool.fetch</text>
+        <text x="100" y="368">observe</text>
+        <text x="184" y="368">recover×2</text>
+      </g>
+    </g>
+
+    <g>
+      <text x="32" y="404" font-size="9" fill-opacity=".45" letter-spacing="1">FLAME</text>
+      <g fill="url(#flame)" stroke="#a9bec1" stroke-opacity=".3" stroke-width=".8">
+        <rect x="80" y="412" width="640" height="6"/>
+        <rect x="80" y="420" width="100" height="4"/>
+        <rect x="184" y="420" width="120" height="4"/>
+        <rect x="308" y="420" width="240" height="4"/>
+        <rect x="552" y="420" width="160" height="4"/>
+        <rect x="180" y="426" width="80" height="3"/>
+        <rect x="264" y="426" width="100" height="3"/>
+        <rect x="368" y="426" width="60" height="3"/>
+        <rect x="430" y="426" width="60" height="3"/>
+        <rect x="490" y="426" width="80" height="3"/>
+        <rect x="574" y="426" width="80" height="3"/>
+        <rect x="654" y="426" width="60" height="3"/>
+        <rect x="190" y="431" width="40" height="2.5"/>
+        <rect x="232" y="431" width="80" height="2.5"/>
+        <rect x="314" y="431" width="40" height="2.5"/>
+        <rect x="356" y="431" width="40" height="2.5"/>
+        <rect x="398" y="431" width="60" height="2.5"/>
+        <rect x="460" y="431" width="40" height="2.5"/>
+        <rect x="502" y="431" width="40" height="2.5"/>
+        <rect x="544" y="431" width="60" height="2.5"/>
+        <rect x="606" y="431" width="60" height="2.5"/>
+        <rect x="668" y="431" width="40" height="2.5"/>
+      </g>
+      <g font-size="7" fill-opacity=".35">
+        <text x="80" y="448">0</text>
+        <text x="220" y="448">0.6s</text>
+        <text x="360" y="448">1.2s</text>
+        <text x="500" y="448">1.8s</text>
+        <text x="640" y="448">2.4s</text>
+        <text x="720" y="448" text-anchor="end">2.84s</text>
+      </g>
+    </g>
+
+    <g font-size="8" fill-opacity=".4">
+      <text x="32" y="478">[trace] span_id=a8f2 parent=root status=OK retries=4 cost=$0.0042</text>
+      <text x="768" y="478" text-anchor="end">EXPORT: OTel / pprof</text>
+    </g>
+  </g>
+</svg>

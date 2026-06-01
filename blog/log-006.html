@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+      <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noimageindex, noarchive" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="You do not need to crack open the model to get a full step graph of your agent. Wrap the runtime, wrap the tools, wrap the I/O. The trace is cleaner, cheaper, and version-agnostic, and it survives every model upgrade."
+    />
+    <title>LOG 006 // Tracing. Mayank Sharma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+<link rel="stylesheet" href="../styles.css" />
+    <script>document.addEventListener("contextmenu",function(e){var t=e.target;if(t&&t.tagName==="IMG"||t&&t.closest&&t.closest("img"))e.preventDefault()});</script>
+</head>
+  <body>
+    <header class="topbar frame">
+      <div>
+        <strong>MS ARCHIVE SYSTEM 1.0</strong>
+        <span>build: 05.31.26</span>
+      </div>
+      <p>FIELD LOG <br />AGENT TRACING</p>
+      <div class="system-state"><i></i> SYSTEM STATUS: ONLINE</div>
+    </header>
+
+    <main>
+      <section class="post">
+        <aside class="axis axis-left"><span>LOG 006 / 007</span></aside>
+        <div class="intro">
+          <p class="eyebrow">FIELD LOG <span>//</span> TRACE</p>
+          <h1 style="margin-top:14px;">TRACING<br />AGENTS WITHOUT<br />INSTRUMENTING<br />THE LLM <b>_</b></h1>
+          <p class="lede">
+            You do not need to crack open the model to get a full
+            step graph of your agent. Wrap the runtime, wrap the
+            tools, wrap the I/O. The trace you get is cleaner,
+            cheaper, and version-agnostic, and it survives every
+            model upgrade. The model is a black box. The system
+            around it is the part worth instrumenting.
+          </p>
+          <div class="post-meta">
+            <span><b>READ TIME</b> &nbsp; 28M</span>
+            <span><b>POSTED</b> &nbsp; 05.31.26</span>
+            <span><b>RUN</b> &nbsp; f3a8-2b19</span>
+            <span><b>STATUS</b> &nbsp; PUBLISHED</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="../assets/blog-trace-graph.svg" alt=""  draggable="false" ondragstart="return false;" />
+          <div class="image-meta">
+            <span>REC_006</span><span>SUBJECT: STEP GRAPH</span><span>CHANNEL: TRACE</span>
+          </div>
+        </div>
+        <aside class="axis axis-right"><span>TIME: <em data-clock>00:00:00</em> GMT</span></aside>
+      </section>
+
+      <section class="log-body">
+        <div class="log-shell">
+          <div class="crumbs">
+            <a href="../index.html">// HOME</a>
+            <span>/</span>
+            <a href="../index.html#archive">/ ARCHIVE</a>
+            <span>/</span>
+            <span>LOG 006</span>
+          </div>
+
+          <header class="log-head">
+            <div class="log-id">LOG 006 <span>TRACE / OBSERVABILITY / OPENTELEMETRY / OPERATION</span></div>
+            <h1>Tracing Agents Without Instrumenting the LLM</h1>
+            <p class="log-deck">
+              A complete trace of an agent run can be built from the
+              outside, by instrumenting the runtime and the tools.
+              You get the same step graph the model API tries to
+              give you, with none of the version drift and a lot
+              less cost. This post is about the step graph, why
+              external instrumentation wins, what coverage looks
+              like when you do it right, and how to keep the trace
+              small enough to query.
+            </p>
+            <div class="log-stats">
+              <span><b>READ</b> &nbsp; 28M</span>
+              <span><b>FILED</b> &nbsp; 05.31.26</span>
+              <span><b>TAGS</b> &nbsp; tracing, observability, opentelemetry, clickhouse, agents</span>
+              <span><b>RUN</b> &nbsp; 5 agents / 2.3M events / ClickHouse</span>
+            </div>
+          </header>
+
+          <article class="prose">
+            <nav class="toc" style="margin: 0 0 36px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11.5px; line-height: 1.9; color: var(--ink);">
+              <p style="margin: 0 0 8px; color: var(--bright); font-size: 10px; letter-spacing: .05em;">// TABLE OF CONTENTS</p>
+              <a href="#dashboard" style="display:block; color: var(--ink);">01 &nbsp; The Dashboard You Can't Trust</a>
+              <a href="#graph" style="display:block; color: var(--ink);">02 &nbsp; The Step Graph</a>
+              <a href="#otel" style="display:block; color: var(--ink);">03 &nbsp; OpenTelemetry and the Standard</a>
+              <a href="#external" style="display:block; color: var(--ink);">04 &nbsp; Why External Wins</a>
+              <a href="#coverage" style="display:block; color: var(--ink);">05 &nbsp; Coverage</a>
+              <a href="#cost" style="display:block; color: var(--ink);">06 &nbsp; Cost</a>
+              <a href="#query" style="display:block; color: var(--ink);">07 &nbsp; Querying the Trace</a>
+              <a href="#light" style="display:block; color: var(--ink);">08 &nbsp; Keeping It Light</a>
+              <a href="#postmortem" style="display:block; color: var(--ink);">09 &nbsp; Post-Mortem</a>
+              <a href="#references" style="display:block; color: var(--ink);">10 &nbsp; References</a>
+            </nav>
+
+            <h2 id="dashboard">// 01 &nbsp; THE DASHBOARD YOU CAN'T TRUST</h2>
+            <p class="drop">
+              A lot of agent observability tools sell you a simple
+              idea: ask the model API to log the call, render the
+              prompt and the response, ship it to a dashboard. The
+              dashboard is nice. The model-side logging is the trap.
+              Every provider has a different format. Every version
+              rotates the schema. The "trace" you store is mostly
+              the prompt, the part of the run you already understand.
+              The interesting part is everything around the model:
+              which tool, with which args, in which order, with
+              which retries, and what happened next.
+            </p>
+            <p>
+              I learned this the hard way on a customer-facing agent
+              in late 2024. We had integrated the provider's
+              "observability" SDK. The SDK logged every call. The
+              dashboard showed every call. The dashboard was wrong.
+              It showed the prompt and the response. It did not
+              show the eight tool calls between them. It did not
+              show the cache hit that saved 1.2 seconds. It did not
+              show the validation failure that triggered a retry.
+              The dashboard showed the parts of the run that the
+              model was involved in. The dashboard did not show the
+              parts of the run that the system was involved in. The
+              system was where the interesting failures happened.
+            </p>
+            <p>
+              The provider upgraded their SDK three times in the
+              next six months. Each upgrade rotated the schema.
+              Each rotation broke our exports. Each break cost us
+              a week of engineering. The week of engineering was
+              not making the agent better. The week of engineering
+              was making the trace of the agent survive a version
+              bump. The trace was the part of the system that was
+              supposed to make our lives easier. The trace was the
+              part of the system that was making our lives harder.
+            </p>
+            <p>
+              The deeper issue is that vendor-supplied tracing is
+              scoped to the vendor's interests. The vendor wants
+              to show you the prompt and the response. The vendor
+              wants to show you token usage and cost. The vendor
+              does not care about your tool latency, your cache
+              hit rate, your retry distribution. The vendor's
+              trace is a feature, not a system. The vendor's
+              trace is a tool for the vendor, not for you. The
+              vendor's trace is a story you are telling yourself
+              about what you can see.
+            </p>
+
+            <h2 id="graph">// 02 &nbsp; THE STEP GRAPH</h2>
+            <p>
+              The right unit of trace is a step, not a turn. A
+              step is a typed record that says: at time <em>t</em>,
+              the runtime entered node <em>n</em> with input
+              <em>i</em>, the system produced output <em>o</em>
+              after duration <em>d</em>, and emitted downstream
+              events <em>E</em>. Tools are nodes. LLM calls are
+              nodes. Cache reads are nodes. Retries are edges back
+              to the same node, with metadata explaining why. The
+              graph is the trace. The trace is a graph. The graph
+              is queryable.
+            </p>
+            <p>
+              The step graph is not a new idea. Distributed
+              tracing has been a graph of spans since Google's
+              <a href="https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/" target="_blank" rel="noopener">Dapper</a>
+              paper (Sigelman et al., 2010). The novelty, for
+              agents, is that the "spans" are heterogeneous. A
+              span might be an LLM call (5,000ms, 4,000 tokens).
+              A span might be a tool call (50ms, a JSON payload).
+              A span might be a cache read (1ms, a hit). A span
+              might be a validation failure (0.5ms, an exception).
+              The graph has many shapes. The graph is a
+              faithful record of the run. The run is not a
+              sequence of LLM calls. The run is a sequence of
+              decisions, some of which involve an LLM.
+            </p>
+            <pre><code>@trace.node("llm.call")
+def call_llm(prompt: str, model: str) -> str:
+    out = provider.complete(prompt, model=model)
+    return out
+
+@trace.node("tool.invoke")
+def invoke_tool(name: str, args: dict) -> ToolResult:
+    return registry[name].run(**args)</code></pre>
+            <p>
+              The decorator is the whole instrumentation. The
+              runtime knows when each node started, when it
+              finished, what it returned, and what it raised.
+              The trace is just the union of those records plus
+              the edges the runtime builds as it dispatches
+              events. There is no provider SDK to depend on.
+              There is no schema migration to schedule. The
+              trace is yours. The trace format is yours. The
+              trace schema is yours. The trace lifetime is
+              yours.
+            </p>
+            <p>
+              The step graph is the right shape because the
+              step graph is what the run actually was. The
+              step graph has a node for every decision. The
+              step graph has an edge for every causal
+              relationship. The step graph is the closest a
+              static record can come to the actual run. The
+              step graph is the difference between a log of
+              "things that happened" and a model of "how the
+              run unfolded."
+            </p>
+
+            <h2 id="otel">// 03 &nbsp; OPENTELEMETRY AND THE STANDARD</h2>
+            <p>
+              The standard for distributed tracing is
+              <a href="https://opentelemetry.io/" target="_blank" rel="noopener">OpenTelemetry</a>.
+              The standard emerged from the 2019 merger of
+              OpenTracing and OpenCensus. The standard covers
+              traces, metrics, and logs. The standard has
+              SDKs for every language that matters. The
+              standard has backends that span every cloud
+              provider and every observability vendor. The
+              standard is the lowest-common-denominator
+              abstraction that the whole industry has
+              agreed on.
+            </p>
+            <p>
+              The standard matters because the alternative is
+              vendor lock-in. Without the standard, your
+              trace is whatever the vendor's SDK produces.
+              With the standard, your trace is whatever you
+              produce, and you can export it to whatever
+              backend you want. The standard is what makes
+              the trace portable. The standard is what makes
+              the trace yours.
+            </p>
+            <p>
+              <a href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" target="_blank" rel="noopener">OpenTelemetry's GenAI semantic conventions</a>
+              (still emerging as of 2026) define the standard
+              span attributes for LLM calls: the model id,
+              the prompt template, the token counts, the
+              finish reason. The conventions are not final.
+              The conventions are being negotiated. The
+              conventions are worth tracking because the
+              conventions are what your dashboards will
+              query. The conventions are what your alerts
+              will fire on. The conventions are what makes
+              your trace interoperable with the rest of the
+              industry's traces.
+            </p>
+            <p>
+              We use the OpenTelemetry SDK for the runtime
+              spans and a custom emitter for the agent-level
+              events. The runtime spans go to a Jaeger
+              backend for live debugging. The agent-level
+              events go to ClickHouse for analytical queries
+              (see <a href="log-004.html">LOG 004</a> on
+              event logs as databases). The two systems
+              share a trace id. The two systems share a
+              span context. The two systems are
+              independent in storage and query. The two
+              systems are unified in identity. The pattern
+              is borrowed from
+              <a href="https://www.brendangregg.com/" target="_blank" rel="noopener">Brendan Gregg's</a>
+              USE method (utilization, saturation, errors)
+              and from the OpenTelemetry collector's
+              multi-receiver architecture.
+            </p>
+
+            <h2 id="external">// 04 &nbsp; WHY EXTERNAL WINS</h2>
+            <p>
+              External instrumentation wins over vendor-supplied
+              tracing for three reasons. The first is stability.
+              The schema is yours. Provider changes, model
+              upgrades, deprecations. None of them touch your
+              trace format. A trace from a year ago is still
+              readable. We have traces from the GPT-3.5 era
+              that load into the same analyzer we use today.
+              That is the whole pitch.
+            </p>
+            <p>
+              The second reason is coverage. You trace the
+              system, not the model call. Cache hits, retries,
+              validation failures, timeouts, queue waits. All
+              captured without any work in the model layer.
+              The interesting regressions are almost never in
+              the model call. They are in everything around
+              it. The model call is the part that the vendor
+              instruments. The model call is the part that
+              works. The interesting regressions are in the
+              parts the vendor does not instrument. The
+              interesting regressions are the parts your own
+              instrumentation catches.
+            </p>
+            <p>
+              The third reason is cost. You are not paying the
+              provider to keep your prompts on their servers.
+              The trace lives in your infrastructure, in the
+              format you control, for as long as you want it.
+              For workflows that touch regulated data (PII,
+              PHI, financial records, legal correspondence),
+              this is the only acceptable arrangement. The
+              prompts and responses cannot leave the system.
+              The trace of the prompts and responses cannot
+              leave the system. The trace must be local. The
+              trace must be yours.
+            </p>
+            <p>
+              The fourth reason, which is less often stated,
+              is that external instrumentation lets you trace
+              things the provider does not even know about.
+              A heuristic that short-circuits a tool call. A
+              cache that pre-computes a result before the
+              model asks. A human-in-the-loop step that
+              pauses the run. A retry policy that backs off.
+              All of these are part of your system. None of
+              them are part of the provider's model. The
+              provider's trace does not see them. Your
+              trace does.
+            </p>
+
+            <h2 id="coverage">// 05 &nbsp; COVERAGE</h2>
+            <p>
+              The interesting failures in agent runs are
+              almost never in the LLM call. They are in the
+              cache miss that triggered a recompute. They
+              are in the retry that succeeded but took 4
+              seconds. They are in the validation that
+              failed and forced a roll-back. They are in
+              the queue wait that added 800ms to a step
+              that should have been instant. The LLM call
+              is the part that works. The LLM call is
+              rarely the part that broke.
+            </p>
+            <p>
+              The coverage question is: which of these
+              intermediate steps does your trace capture?
+              A trace that captures only the LLM call is
+              a log, not a trace. A trace that captures
+              only the top-level tool calls is missing
+              the cache, the validation, the queue, the
+              retry. A trace that captures the runtime
+              is the only trace that is complete.
+            </p>
+            <p>
+              The runtime that does the capturing is the
+              same runtime I described in
+              <a href="log-004.html">LOG 004</a>. The
+              event bus emits events. The tracing
+              decorator wraps the handlers. The trace
+              metadata rides on the event. The trace
+              metadata is the union of all the spans.
+              The spans are the union of all the
+              handlers. The handlers are the union of
+              all the tools. The coverage is total by
+              construction.
+            </p>
+            <p>
+              The cost of total coverage is that the
+              trace is large. A 30-step agent run might
+              produce 200 spans (LLM calls, tool calls,
+              cache reads, validations, retries). The
+              span count is high. The span count is the
+              price of coverage. The price is worth
+              paying. The price is the difference
+              between a trace and a log.
+            </p>
+
+            <h2 id="cost">// 06 &nbsp; COST</h2>
+            <p>
+              The cost of external tracing has three
+              components. The first is instrumentation
+              overhead. A tracing decorator adds a few
+              microseconds per span. A span is created
+              at the start of the handler. The span is
+              closed at the end. The overhead is the
+              time of the span's start and stop. The
+              overhead is negligible relative to the
+              handler's actual work. We have measured
+              less than 0.5% overhead on our agents.
+            </p>
+            <p>
+              The second cost is storage. A trace is a
+              set of spans with metadata. A span with
+              all its attributes is roughly 1KB in
+              JSON. A 200-span trace is 200KB. A
+              2.3M-event month is roughly 4.5GB of
+              trace metadata. ClickHouse compresses
+              that to about 200MB. The cost is the
+              storage plus the disk I/O. The cost is
+              trivial. The cost is the price of having
+              a queryable trace.
+            </p>
+            <p>
+              The third cost is the cognitive overhead
+              of the schema. You have to design the
+              span attributes. You have to design the
+              event types. You have to design the
+              relationship between them. The design
+              is the cost. The design is the part that
+              determines whether the trace is
+              queryable. The design is the part that
+              is hard to change later. The design is
+              worth getting right up front. The
+              design is the difference between a
+              trace and a pile of spans.
+            </p>
+            <p>
+              The hidden fourth cost is the
+              coordination cost of standardizing the
+              schema across teams. If team A's agent
+              emits spans with attribute
+              <code>llm.model</code> and team B's
+              agent emits spans with attribute
+              <code>model.id</code>, the traces are
+              not joinable. The fix is the semantic
+              conventions. The fix is also cultural.
+              The fix takes longer than the technical
+              work. The fix is the price of having a
+              shared observability story.
+            </p>
+
+            <h2 id="query">// 07 &nbsp; QUERYING THE TRACE</h2>
+            <p>
+              A step graph is a graph. Once you have it,
+              the questions that used to require custom
+              logging become a query. "What is the median
+              number of tool calls per run, broken down
+              by task class, over the last thirty days."
+              "Which tool has the highest retry rate." "For
+              runs that exceeded the latency budget, what
+              was the longest single step." These are
+              aggregations over a structured dataset, and
+              they answer themselves in seconds. The same
+              questions against model-side logs are
+              regexes and hope.
+            </p>
+            <p>
+              The query layer we use is ClickHouse. The
+              spans are flattened into a wide table with
+              one row per span and columns for every
+              attribute. The columns are typed. The
+              columns are indexed. The query planner
+              picks the right index for each query. A
+              p99 latency query over a week of data
+              returns in under 200ms. A full-text search
+              over the prompt payloads returns in under
+              500ms. The latency is dominated by the
+              network hop, not the query.
+            </p>
+            <p>
+              The query language is SQL. The dashboarding
+              tool is Metabase. The alerting is
+              ClickHouse's built-in webhook integration.
+              The whole stack is open-source. The whole
+              stack is on our infrastructure. The whole
+              stack is ours to modify. The whole stack
+              has been running for two years without a
+              vendor-mandated schema change. That is the
+              cost story. That is the stability story.
+              That is the reason external tracing wins.
+            </p>
+            <blockquote>
+              A trace is a database. If you cannot query
+              it like one, you are storing logs, not
+              traces, and the difference matters the
+              first time you have to debug a regression
+              at 2am.
+            </blockquote>
+
+            <h2 id="light">// 08 &nbsp; KEEPING IT LIGHT</h2>
+            <p>
+              The risk of homegrown tracing is the
+              temptation to capture everything. The
+              temptation is real. The cost is also real.
+              A trace that stores every prompt and
+              response in the span metadata is a trace
+              that bloats to gigabytes per day. A
+              trace that bloats is a trace that becomes
+              slow to query. A trace that is slow to
+              query is a trace that nobody queries. A
+              trace that nobody queries is a trace that
+              is not worth the storage cost.
+            </p>
+            <p>
+              The discipline is: capture the shape, not
+              the bytes. Store the inputs and outputs of
+              each step as references. A hash. A pointer
+              to object storage. A span id. Not as
+              inline payloads. The trace stays small
+              enough to query. The full payloads stay
+              available when you actually need them, in
+              a system that is good at holding large
+              objects and bad at querying them. S3 for
+              payloads. ClickHouse for the trace
+              metadata. The two never mix. The queries
+              stay sub-second on a year of data.
+            </p>
+            <p>
+              The pattern is borrowed from how
+              observability vendors like Honeycomb
+              structure their storage. The metadata is
+              the index. The payloads are the body. The
+              index is queried. The body is fetched on
+              demand. The two have different storage
+              characteristics. The two have different
+              query patterns. The two should have
+              different storage systems.
+            </p>
+            <p>
+              The other discipline is to sample
+              aggressively. Not every run needs to be
+              traced at full fidelity. The interesting
+              runs (slow runs, failed runs, expensive
+              runs) get traced at full fidelity. The
+              uninteresting runs (fast, successful,
+              cheap) get sampled at 1%. The sampling
+              rate is configurable. The sampling
+              decision is made at runtime. The
+              sampling decision is logged. The
+              sampling decision is auditable.
+            </p>
+
+            <h2 id="postmortem">// 09 &nbsp; POST-MORTEM</h2>
+            <p>
+              A few things I want to flag from our own
+              work. The first is that the trace is the
+              most valuable debugging tool we have. Not
+              the most sophisticated. The most valuable.
+              The trace is the difference between "the
+              agent failed, I don't know why" and "the
+              agent failed at step 14 because the cache
+              returned a stale value, which the model
+              trusted, which led to a wrong tool call,
+              which led to the failure." The trace is
+              the explanation. The explanation is the
+              debugging. The debugging is the fix.
+            </p>
+            <p>
+              The second is that the trace is a
+              forcing function for code quality. A
+              system that is easy to trace is a system
+              with clean boundaries. A system with
+              clean boundaries is a system that is
+              easy to reason about. The two are
+              correlated. The correlation is not a
+              coincidence. The boundaries are the
+              trace points. The trace points are the
+              boundaries. The naming is the same. The
+              naming should be the same.
+            </p>
+            <p>
+              The third is that the trace is the
+              foundation for the eval system (LOG 005)
+              and the event log (LOG 004). The trace is
+              the data. The eval is the analysis. The
+              event log is the storage. The three are
+              layered. The three are coupled. The
+              three are the observability stack. The
+              observability stack is the part of the
+              system that decides whether you can
+              trust the system.
+            </p>
+            <p>
+              The full OpenTelemetry configuration, the
+              span attribute conventions we use, the
+              ClickHouse schema for the trace metadata,
+              and the S3 layout for the payloads are
+              all documented in the tracing repo. The
+              source is at
+              <a href="https://huggingface.co/spaces/nebiuz/agent-tracing" target="_blank" rel="noopener">huggingface.co/spaces/nebiuz/agent-tracing</a>.
+              The setup builds on the OpenTelemetry
+              SDK, the Jaeger backend, ClickHouse for
+              the analytical store, and S3 for the
+              payload archive. The whole stack is
+              open-source. The whole stack is
+              self-hostable. The whole stack is the
+              alternative to vendor-supplied tracing.
+            </p>
+
+            <h2 id="references">// 10 &nbsp; REFERENCES</h2>
+            <ol style="font-size: 12px; line-height: 1.8; color: var(--ink); padding-left: 22px;">
+              <li>Sigelman, B. H., et al. (2010). <i>Dapper, a Large-Scale Distributed Systems Tracing Infrastructure.</i> Google Technical Report. <a href="https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/" target="_blank" rel="noopener">link</a></li>
+              <li>OpenTelemetry Project. (2024). <i>OpenTelemetry Documentation.</i> CNCF. <a href="https://opentelemetry.io/" target="_blank" rel="noopener">link</a></li>
+              <li>OpenTelemetry Project. (2024). <i>Semantic Conventions for Generative AI Systems.</i> <a href="https://opentelemetry.io/docs/specs/semconv/gen-ai/" target="_blank" rel="noopener">link</a></li>
+              <li>Kaldor, J., Mace, J., Sigelman, S., &amp; Yoon, M. (2017). <i>Canopy: An End-to-End Performance Tracing And Analysis System.</i> SOSP 2017.</li>
+              <li>Mace, J., Roelke, R., &amp; Fonseca, R. (2015). <i>Pivot Tracing: Dynamic Causal Monitoring for Distributed Systems.</i> SOSP 2015.</li>
+              <li>Gregg, B. (2019). <i>The USE Method.</i> brendangregg.com. <a href="https://www.brendangregg.com/usemethod.html" target="_blank" rel="noopener">link</a></li>
+              <li>Jaeger Project. (2024). <i>Jaeger: A Distributed Tracing Platform.</i> CNCF. <a href="https://www.jaegertracing.io/" target="_blank" rel="noopener">link</a></li>
+              <li>Zipkin Project. (2024). <i>Zipkin Documentation.</i> <a href="https://zipkin.io/" target="_blank" rel="noopener">link</a></li>
+              <li>ClickHouse, Inc. (2024). <i>ClickHouse Documentation.</i> <a href="https://clickhouse.com/docs" target="_blank" rel="noopener">link</a></li>
+              <li>LangSmith. (2024). <i>LangSmith Documentation.</i> LangChain. <a href="https://docs.smith.langchain.com/" target="_blank" rel="noopener">link</a></li>
+              <li>Arize AI. (2024). <i>OpenInference: An Open Standard for AI Observability.</i> <a href="https://github.com/Arize-ai/openinference" target="_blank" rel="noopener">link</a></li>
+              <li>Langfuse. (2024). <i>Langfuse Documentation.</i> <a href="https://langfuse.com/docs" target="_blank" rel="noopener">link</a></li>
+              <li>Helicone. (2024). <i>Helicone: Observability for LLMs.</i> <a href="https://docs.helicone.ai/" target="_blank" rel="noopener">link</a></li>
+              <li>W3C. (2020). <i>Trace Context Level 1.</i> W3C Recommendation. <a href="https://www.w3.org/TR/trace-context/" target="_blank" rel="noopener">link</a></li>
+              <li>Fonseca, R., Porter, G., Katz, R. H., &amp; Shenker, S. (2007). <i>X-Trace: A Pervasive Network Tracing Framework.</i> NSDI 2007.</li>
+              <li>Chen, A. (2019). <i>Site Reliability Engineering: Measuring and Managing Reliability.</i> Google.</li>
+              <li>Honeycomb. (2024). <i>Honeycomb Observability Documentation.</i> <a href="https://docs.honeycomb.io/" target="_blank" rel="noopener">link</a></li>
+              <li>Mace, J. (2018). <i>End-to-End Tracing: Adopting and Adapting Dapper.</i> Brown University PhD Thesis.</li>
+            </ol>
+
+            <h2 style="margin-top: 48px;">// ACKNOWLEDGMENTS</h2>
+            <p style="font-size: 12.5px; line-height: 1.75; color: var(--ink);">
+              The tracing stack draws on a long lineage of
+              distributed-systems work. The Dapper paper at
+              Google is the foundational reference for
+              span-based tracing. The OpenTelemetry project
+              is the industry-standard implementation of
+              that model. The W3C Trace Context spec is
+              the standard for cross-service trace
+              propagation. The Jaeger and Zipkin projects
+              are the reference open-source backends. The
+              Brendan Gregg USE method is the lens for
+              thinking about what to instrument. The
+              Honeycomb high-cardinality event model is
+              the inspiration for storing payloads
+              separately from metadata. The OpenInference
+              conventions are the emerging standard for
+              LLM-specific span attributes. The synthesis
+              of these pieces into an agent-specific
+              tracing stack is the contribution of this
+              post. The vendor-supplied alternative is the
+              one I do not recommend.
+            </p>
+
+            <p style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--faint); font-size: 10px; color: var(--dim);">
+              <b style="color: var(--bright); font-weight: 500;">TAGS</b> &nbsp; tracing &nbsp;·&nbsp; observability &nbsp;·&nbsp; opentelemetry &nbsp;·&nbsp; clickhouse &nbsp;·&nbsp; dapper &nbsp;·&nbsp; agents &nbsp;·&nbsp; step-graph &nbsp;·&nbsp; spans
+            </p>
+
+          </article>
+
+          <nav class="log-foot">
+            <a href="../index.html#archive">&larr; BACK TO ARCHIVE</a>
+            <div class="nav">
+              <a href="log-005.html">&larr; PREV: LOG 005</a>
+              <a href="log-007.html">NEXT: LOG 007 &rarr;</a>
+            </div>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer frame">
+      <p>COPYRIGHT © MAYANK SHARMA 2026<br />ALL RIGHTS RESERVED</p>
+      <p>FIELD LOG 006<br />AGENT TRACING</p>
+      <p>DESIGNED + BUILT BY HUMAN<br />FOR INTELLIGENT SYSTEMS</p>
+    </footer>
+
+    <dialog class="command-dialog">
+      <form method="dialog">
+        <div class="command-top"><span>&gt; NAVIGATE_ARCHIVE</span><button aria-label="Close">ESC</button></div>
+        <div class="command-list">
+          <a href="../index.html"><span>01</span>SCAN / HOME</a>
+          <a href="../index.html#projects"><span>02</span>WORK / PROJECTS</a>
+          <a href="../logs.html"><span>03</span>LOGS / ALL</a>
+          <a href="../index.html#contact"><span>04</span>CONTACT</a>
+          <a href="../resume.html"><span>05</span>FILE / RESUME</a>
+          <a href="../signals.html"><span>06</span>SIGNALS / NETWORK</a>
+        </div>
+      </form>
+    </dialog>
+    <script src="../src/legacy.js"></script>
+  </body>
+</html>

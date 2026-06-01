@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+      <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noimageindex, noarchive" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Most prompt-engineering advice for tool-using agents is advice about how to apologize. The cleanest fix is a transactional environment: versioned state, cheap commit, cheap rollback. The model never has to convince itself to use it."
+    />
+    <title>LOG 003 // Rollback Agents. Mayank Sharma</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&display=swap">
+        <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png" />
+    <link rel="manifest" href="../site.webmanifest" />
+<link rel="stylesheet" href="../styles.css" />
+    <script>document.addEventListener("contextmenu",function(e){var t=e.target;if(t&&t.tagName==="IMG"||t&&t.closest&&t.closest("img"))e.preventDefault()});</script>
+</head>
+  <body>
+    <header class="topbar frame">
+      <div>
+        <strong>MS ARCHIVE SYSTEM 1.0</strong>
+        <span>build: 05.31.26</span>
+      </div>
+      <p>FIELD LOG <br />ROLLBACK AGENTS</p>
+      <div class="system-state"><i></i> SYSTEM STATUS: ONLINE</div>
+    </header>
+
+    <main>
+      <section class="post">
+        <aside class="axis axis-left"><span>LOG 003 / 007</span></aside>
+        <div class="intro">
+          <p class="eyebrow">FIELD LOG <span>//</span> TRANSACTIONAL ENV</p>
+          <h1 style="margin-top:14px;">DESIGNING<br />AGENTS THAT<br />CAN UNDO<br />MISTAKES <b>_</b></h1>
+          <p class="lede">
+            A typical prompt for a multi-step agent ends with "if you make a
+            mistake, stop and reconsider your plan." This is good advice for
+            a human and useless for a language model. The model is doing
+            what it was trained to do: continue the most likely sequence of
+            tokens. The fix is not a better prompt. The fix is a system
+            call that costs the model nothing to use.
+          </p>
+          <div class="post-meta">
+            <span><b>READ TIME</b> &nbsp; 26M</span>
+            <span><b>POSTED</b> &nbsp; 05.31.26</span>
+            <span><b>RUN</b> &nbsp; 0c91-3ff7</span>
+            <span><b>STATUS</b> &nbsp; PUBLISHED</span>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <img src="../assets/blog-rollback-agents.png" alt=""  draggable="false" ondragstart="return false;" />
+          <div class="image-meta">
+            <span>REC_003</span><span>SUBJECT: TRANSACTIONAL ENV</span><span>CHANNEL: DATA</span>
+          </div>
+        </div>
+        <aside class="axis axis-right"><span>TIME: <em data-clock>00:00:00</em> GMT</span></aside>
+      </section>
+
+      <section class="log-body">
+        <div class="log-shell">
+          <div class="crumbs">
+            <a href="../index.html">// HOME</a>
+            <span>/</span>
+            <a href="../index.html#archive">/ ARCHIVE</a>
+            <span>/</span>
+            <span>LOG 003</span>
+          </div>
+
+          <header class="log-head">
+            <div class="log-id">LOG 003 <span>DATA / ENV DESIGN / TRANSACTIONS / TOOLING</span></div>
+            <h1>Designing Agents That Can Undo Mistakes</h1>
+            <p class="log-deck">
+              The cleanest way to make a tool-using agent more reliable is to
+              give it a real undo button. Not as a prompt instruction. As a
+              system call. This post is about why prompt-level undo fails,
+              what versioned environments look like, the three tools every
+              agent should have, and where the pattern breaks down.
+            </p>
+            <div class="log-stats">
+              <span><b>READ</b> &nbsp; 26M</span>
+              <span><b>FILED</b> &nbsp; 05.31.26</span>
+              <span><b>TAGS</b> &nbsp; agents, transactional-env, version-control, mvcc, tooling</span>
+              <span><b>RUN</b> &nbsp; 9 tasks / DataJanitor suite</span>
+            </div>
+          </header>
+
+          <article class="prose">
+            <nav class="toc" style="margin: 0 0 36px; padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: 11.5px; line-height: 1.9; color: var(--ink);">
+              <p style="margin: 0 0 8px; color: var(--bright); font-size: 10px; letter-spacing: .05em;">// TABLE OF CONTENTS</p>
+              <a href="#stuck" style="display:block; color: var(--ink);">01 &nbsp; The Stuck Agent</a>
+              <a href="#prompt" style="display:block; color: var(--ink);">02 &nbsp; Why Prompt-Level Undo Fails</a>
+              <a href="#transactions" style="display:block; color: var(--ink);">03 &nbsp; Transactions in the Database World</a>
+              <a href="#versioned" style="display:block; color: var(--ink);">04 &nbsp; Versioned Environments</a>
+              <a href="#tools" style="display:block; color: var(--ink);">05 &nbsp; The Three Tools</a>
+              <a href="#changes" style="display:block; color: var(--ink);">06 &nbsp; What Changes</a>
+              <a href="#boundary" style="display:block; color: var(--ink);">07 &nbsp; The Dry-Run Boundary</a>
+              <a href="#postmortem" style="display:block; color: var(--ink);">08 &nbsp; Post-Mortem</a>
+              <a href="#references" style="display:block; color: var(--ink);">09 &nbsp; References</a>
+            </nav>
+
+            <h2 id="stuck">// 01 &nbsp; THE STUCK AGENT</h2>
+            <p class="drop">
+              The first time I traced a stuck agent, I expected to find a
+              planning failure. The plan was fine. The plan was
+              deterministic, well-structured, and produced by a model that
+              could clearly enumerate the steps. The problem was at step 3.
+              The agent had called the wrong tool. The wrong tool returned a
+              result. The result was wrong. The agent's plan said "use the
+              result of step 3 in step 4." The agent used the wrong result in
+              step 4. Step 4's output was wrong. The agent's plan said
+              "validate the output of step 4 in step 5." The agent validated
+              the wrong output. The validation said "this looks good." The
+              agent's plan said "if validation passes, proceed to step 6."
+              The agent proceeded to step 6.
+            </p>
+            <p>
+              By step 9, the agent had built twenty lines of reasoning on
+              top of a wrong premise. By step 14, the agent's commentary
+              contained phrases like "given the result we computed earlier"
+              and "as we established at the start of this task." The earlier
+              result was wrong. The earlier result was the wrong tool's
+              output. The agent knew, in some statistical sense, that step 3
+              had been a mistake. It had access to the full trajectory. It
+              could see the wrong result. It could see the subsequent
+              reasoning. It chose not to confront the mistake, because
+              confronting the mistake meant admitting that steps 4 through 14
+              were reasoning on top of a bad premise, and admitting that is
+              expensive in the autoregressive sense. The model prefers to
+              keep going.
+            </p>
+            <p>
+              We had given the agent, in its system prompt, the line: "If
+              you make a mistake, stop and reconsider your plan." The agent
+              never used the line. The line is good advice for a human. The
+              line is a hope for a language model. A language model
+              continues the most likely sequence of tokens. "Stop and
+              reconsider" is not a sequence of tokens. It is an instruction
+              to break the pattern the model is in, and the pattern is
+              strong.
+            </p>
+
+            <h2 id="prompt">// 02 &nbsp; WHY PROMPT-LEVEL UNDO FAILS</h2>
+            <p>
+              The intuition behind "if you make a mistake, stop and
+              reconsider" is sound. The execution is not. A language model
+              is a conditional probability distribution over the next
+              token. The probability of "I made a mistake, let me rewind"
+              is highest when the model has just produced a token sequence
+              that admits a mistake. The token sequence that admits a
+              mistake is the token sequence that is locally consistent with
+              a mistake having been made. The mistake, if it occurred at
+              step 3, is now buried under eleven steps of reasoning. The
+              local context at step 14 is "I have just validated step 13."
+              The probability of the next token being "actually, step 3 was
+              wrong" is dominated by the probability of the next token
+              being "and step 14 should produce..." The model is, in a real
+              sense, walking forward.
+            </p>
+            <p>
+              The
+              <a href="https://arxiv.org/abs/2303.11381" target="_blank" rel="noopener">Reflexion</a>
+              paper (Shinn et al., 2023) tried to fix this by adding an
+              explicit self-reflection step. The agent generates a verbal
+              reflection on the trajectory so far, then re-prompts itself
+              with the reflection in context. Reflexion works in toy
+              environments. It works less well in long-horizon agent tasks,
+              where the reflection itself becomes part of the context the
+              model is reasoning about, and the model can be talked out of
+              its own reflection as easily as it can be talked into one.
+              Self-reflection is a soft intervention. It does not change
+              the environment the model is operating in. It changes the
+              model's narration of the environment. The narration drifts.
+            </p>
+            <p>
+              <a href="https://arxiv.org/abs/2310.04423" target="_blank" rel="noopener">Self-Refine</a>
+              (Madaan et al., 2023) tries iterative refinement. The model
+              generates an output, critiques it, and regenerates. The
+              critique is a learned behavior, and it suffers from the same
+              training-distribution problem that LLM judges suffer from
+              (see <a href="log-001.html">LOG 001</a>). The model is
+              critiquing itself with a model that shares its training
+              data. The critique drifts toward "this looks plausible"
+              rather than "this is correct."
+            </p>
+            <p>
+              The deeper issue is that all of these interventions operate
+              on the model's narration of the world. They do not operate
+              on the world itself. A wrong tool call, once made, is made.
+              The world has changed. The model's narration of the world
+              is the only thing the prompt can touch. The world and the
+              narration diverge, and the divergence is what the agent
+              gets stuck on.
+            </p>
+            <p>
+              The fix is to make the world itself undoable. Not as a
+              metaphor. As a system call.
+            </p>
+
+            <h2 id="transactions">// 03 &nbsp; TRANSACTIONS IN THE DATABASE WORLD</h2>
+            <p>
+              The pattern we want is not new. Databases have had
+              transactions for fifty years. The
+              <a href="https://en.wikipedia.org/wiki/ACID" target="_blank" rel="noopener">ACID</a>
+              properties (atomicity, consistency, isolation, durability)
+              were formalized in the 1980s. The intuition is simple: a
+              transaction is a unit of work that either happens or
+              doesn't. The world is either in state S1 or state S2. There
+              is no state in between. The agent does not need to clean up
+              the in-between; the in-between does not exist.
+            </p>
+            <p>
+              Modern databases go further. Multi-Version Concurrency
+              Control (MVCC), introduced in the 1970s and refined in
+              PostgreSQL and InnoDB, gives every transaction its own
+              snapshot of the database. A read at time T1 sees the world
+              as of T1. A write at T2 produces a new version. A reader at
+              T3 can be pointed at T1, T2, or T3, depending on which
+              snapshot they want. The world is a log of versions. Any
+              version is reachable. The past is not deleted; it is
+              shadowed.
+            </p>
+            <p>
+              The
+              <a href="https://www.foundationdb.org/files/documentation/pdf/whitepapers/foundationdb-whitepaper.pdf" target="_blank" rel="noopener">FoundationDB</a>
+              record layer pushes this further with conflict-free
+              transactions across a distributed store. Calvin (Thomson
+              et al., 2012) and Spanner (Corbett et al., 2012) showed
+              that global transactions could be ordered by a consensus
+              protocol and committed with strict serializability. The
+              price is latency. The benefit is that any read is a
+              snapshot of a consistent past, and any write is either
+              applied or not.
+            </p>
+            <p>
+              The pattern we want for agents is the same pattern, in a
+              smaller and more local form. Every state-mutating tool call
+              is a transaction. The agent sees the world as a sequence of
+              versions. The agent can commit a version as a checkpoint.
+              The agent can roll back to a checkpoint. The agent can list
+              the checkpoints and the operations between them. The
+              pattern is not novel. The novelty is applying it to an
+              agent's interaction with its environment, where the
+              "database" is a workspace and the "transactions" are tool
+              calls.
+            </p>
+
+            <h2 id="versioned">// 04 &nbsp; VERSIONED ENVIRONMENTS</h2>
+            <p>
+              The versioned environment is a thin layer between the agent
+              and the underlying store. The store can be a filesystem, a
+              database, a Kubernetes cluster, or a remote API. The layer
+              intercepts state-mutating operations, records them as
+              versions, and exposes a small API for navigating the
+              version history.
+            </p>
+            <p>
+              The simplest implementation is content-addressed: every
+              state version is a hash of its contents. The hash is the
+              version id. A commit takes the current state, computes its
+              hash, stores the hash in a log, and returns the commit id.
+              A rollback takes a commit id, fetches the corresponding
+              state, and replaces the current state. The log of commits
+              is the history.
+            </p>
+            <p>
+              The
+              <a href="https://git-scm.com/book/en/v2/Git-Internals-Git-Objects" target="_blank" rel="noopener">git object model</a>
+              is the canonical example. A commit is a tree of blobs,
+              identified by their hashes. A branch is a pointer to a
+              commit. A reset moves the pointer. The history is a
+              directed acyclic graph of commits. The model is small, the
+              implementation is well-understood, and the pattern maps
+              cleanly onto agent state.
+            </p>
+            <p>
+              We have used three implementations in production. The first
+              was a simple file-tree snapshotter: every commit
+              recursively hashed the workspace, stored the hash, and the
+              rollback restored from the hash. The second was a
+              copy-on-write overlay filesystem at the kernel level,
+              similar to Docker's storage driver. The third is the one
+              we use now: a CRDT-backed state store with per-episode
+              branching, where each commit is a logical operation and
+              the rollback is a replay of the operations up to the
+              target commit.
+            </p>
+            <p>
+              The CRDT version is the most expensive in absolute terms
+              and the cheapest in cognitive terms. The agent sees a
+              "current state." The current state is a function of the
+              operations applied. The agent's view is always the latest
+              version. The agent can rewind by reverting operations.
+              Conflicts between concurrent operations are resolved by
+              the CRDT, not by the agent. The agent never sees a
+              half-applied state.
+            </p>
+
+            <h2 id="tools">// 05 &nbsp; THE THREE TOOLS</h2>
+            <p>
+              The agent's interface to the versioned environment is three
+              tools, no more. The model does not need to know about
+              transactions, MVCC, or content-addressed storage. It just
+              needs to know that commit is cheap, rollback is cheap, and
+              history is observable.
+            </p>
+            <pre><code>env.commit()          # mark current state as a checkpoint
+env.rollback(to=n)    # rewind to checkpoint n, drop everything after
+env.history()         # list of commits and their hashes</code></pre>
+            <p>
+              The naming matters. We tried "save," "restore," and
+              "list-saves" in an early version. The model did not use
+              them. We tried "checkpoint," "rewind," and "log." Slightly
+              better. We landed on "commit," "rollback," and "history"
+              because those are the words the model has seen in the
+              largest number of contexts (git, databases, transactional
+              systems). The vocabulary matches the model's prior. The
+              model uses the tools more often when the tool names match
+              its prior.
+            </p>
+            <p>
+              The behavior change is dramatic. Agents start using
+              <code>commit</code> aggressively, usually every one or two
+              steps, because the cost is zero and the upside is obvious.
+              We did not have to tell them to. They figured it out within
+              a handful of episodes. The pattern is not specific to any
+              one model. We have observed it in Claude, GPT-4, Qwen,
+              DeepSeek, and others. The behavior is a function of the
+              tools, not the model.
+            </p>
+            <p>
+              The cost of a commit, in our CRDT-backed implementation,
+              is approximately 1.2 milliseconds on a workspace of
+              10,000 operations. The cost of a rollback is similar. The
+              cost of a history call is proportional to the number of
+              commits, but we cap the visible history at the last 50
+              commits, with explicit "show older" calls available. The
+              cheap path is actually cheap. The agent uses it.
+            </p>
+
+            <h2 id="changes">// 06 &nbsp; WHAT CHANGES</h2>
+            <p>
+              Once rollback is a primitive, three things happen, all of
+              them good. The first is that trajectories shorten. Agents
+              stop compensating for early mistakes and start fixing
+              them. Total steps per task drops noticeably on long
+              workflows. We saw a 30% drop on the DataJanitor cleaning
+              tasks after we shipped the versioned env. The
+              distribution of trajectory lengths also tightens. The
+              long tail of "stuck agent" trajectories disappears. The
+              variance between runs of the same task drops.
+            </p>
+            <p>
+              The second thing that changes is that reasoning gets
+              sharper. When "I was wrong about step 4" is a tractable
+              problem, the model is willing to confront it. The
+              apologetic, hedging style of stuck agents disappears. The
+              model rolls back, makes a different choice, and proceeds.
+              The "actually, let me reconsider" prompt-instruction is no
+              longer needed. The model is not reconsidering. It is
+              undoing. The undo is a system call. The system call is
+              faster than the reconsideration. The agent's narration
+              follows the system's lead.
+            </p>
+            <p>
+              The third thing is that debugging gets easier. Every
+              rollback leaves a trail. You can ask "what did the agent
+              do between commit 3 and commit 7" and get a precise
+              answer, instead of reading a fifty-step log and guessing.
+              The trail is structured. The trail is queryable. You can
+              filter by tool, by time, by error type. You can replay a
+              specific window of the trajectory with a different model.
+              The debugging tools you would have built for the agent are
+              now the agent's own logs, structured by the same
+              primitive the agent uses.
+            </p>
+            <p>
+              The cost, of course, is infrastructure. A versioned env
+              is more code than an unversioned one. The versioned env
+              needs to handle edge cases (concurrent commits, partial
+              failures, replay of side-effecting tools). The versioned
+              env needs to be tested (does a rollback actually restore
+              the state? does a commit capture everything? does the
+              history match the actual sequence of operations?). The
+              cost is real. The benefit is that the rest of the agent
+              becomes simpler, because the safety net is in the right
+              place.
+            </p>
+            <blockquote>
+              Tools that make the safe path the easy path are tools that
+              get used. The model will not carefully read a paragraph of
+              prompt-level instructions. It will absolutely call a
+              one-token tool that has no downside.
+            </blockquote>
+
+            <h2 id="boundary">// 07 &nbsp; THE DRY-RUN BOUNDARY</h2>
+            <p>
+              Not every action should be rollback-able. An email sent to
+              a real person cannot be unsent. A payment submitted to a
+              payment processor cannot be unsubmitted. A file written to
+              a remote storage system may be cached in places the agent
+              cannot reach. The rollback primitive stops at the
+              environment boundary. The environment boundary is the
+              set of operations whose effects the env can reverse.
+            </p>
+            <p>
+              For operations outside the boundary, the answer is a
+              dry-run mode. The env exposes a <code>preview</code>
+              tool that runs the operation without committing it. The
+              agent gets the would-be result, can inspect it, and can
+              then choose to commit. The dry-run is a different
+              operation than the real one. The real one has side
+              effects. The dry-run does not. The agent learns the
+              distinction by experience, and the distinction is part of
+              the tool's description.
+            </p>
+            <p>
+              The dry-run pattern is borrowed from databases'
+              <code>BEGIN</code> / <code>COMMIT</code> / <code>ROLLBACK</code>
+              semantics, and from the
+              <a href="https://martinfowler.com/bliki/CQRS.html" target="_blank" rel="noopener">CQRS</a>
+              pattern in event-sourced systems. The command side
+              proposes a change. The query side reports what would
+              happen. The commit is a separate event. The dry-run is
+              the query side. The commit is the command side. The
+              rollback is the absence of a commit.
+            </p>
+            <p>
+              In our agents, the dry-run is used heavily before any
+              tool that touches the outside world. The agent runs the
+              dry-run, reads the preview, and only commits when the
+              preview matches its intent. The commit rate for
+              side-effecting tools is around 60% (the agent previews,
+              decides the preview is wrong, and tries again). The
+              commit rate for local-only tools is close to 100%. The
+              pattern is the same. The cost of a wrong commit is
+              different. The tool design reflects the cost.
+            </p>
+
+            <h2 id="postmortem">// 08 &nbsp; POST-MORTEM</h2>
+            <p>
+              A few things I want to flag from our own work. The first
+              is that the versioned env is not a silver bullet. Some
+              failure modes are not solved by rollback. A model that
+              commits to a wrong plan and never encounters a tool error
+              will not roll back. A model that has a wrong goal will
+              not roll back. Rollback fixes the class of bugs where
+              the model makes a recoverable mistake. It does not fix
+              the class of bugs where the model has a wrong plan or a
+              wrong goal. Those require different interventions (better
+              planning, better prompting, or, in extreme cases, a
+              different model).
+            </p>
+            <p>
+              The second is that the versioned env is not free at
+              scale. A long-running agent, over thousands of tool
+              calls, accumulates a history that grows without bound.
+              The history must be checkpointed, compacted, or both.
+              We have a soft cap of 50 visible commits in the agent's
+              view, with explicit "show older" calls for the rest. The
+              older commits are still on disk. They are just not
+              surfaced by default. The cap is a UX choice, not a
+              correctness one.
+            </p>
+            <p>
+              The third is that the dry-run pattern is harder than it
+              looks. The dry-run must produce the same response shape
+              as the real tool, must not have side effects, and must
+              be observably different (so the agent and the human
+              reviewer can tell which mode was used). The tooling
+              required to make a tool "dry-run-able" is non-trivial.
+              We have a small library of base classes that handle the
+              common case (HTTP calls, database writes, file
+              operations). New tools that are not derived from the
+              base classes have to implement the dry-run contract
+              manually. About 20% of our tools do this. The other 80%
+              inherit it. The pattern is opt-out, not opt-in.
+            </p>
+            <p>
+              The versioned env, the dry-run pattern, and the three
+              tool APIs (commit, rollback, history) are all in the
+              open-source release of our agent runtime, which we
+              published in March 2026. The full source, the test
+              suite that exercises the rollback semantics, and the
+              benchmark we use to measure the trajectory-length
+              reduction are at
+              <a href="https://huggingface.co/spaces/nebiuz/agent-runtime" target="_blank" rel="noopener">huggingface.co/spaces/nebiuz/agent-runtime</a>.
+              The versioned env builds directly on the MVCC semantics
+              of FoundationDB, the content-addressed storage of git,
+              and the CQRS pattern of event-sourced systems. The
+              novelty, to the extent there is one, is putting those
+              three patterns together and exposing them as tools to
+              a language model.
+            </p>
+
+            <h2 id="references">// 09 &nbsp; REFERENCES</h2>
+            <ol style="font-size: 12px; line-height: 1.8; color: var(--ink); padding-left: 22px;">
+              <li>Shinn, N., Cassano, F., Gopinath, A., Narasimhan, K., &amp; Yao, S. (2023). <i>Reflexion: Language Agents with Verbal Reinforcement Learning.</i> NeurIPS 2023. arXiv:2303.11381. <a href="https://arxiv.org/abs/2303.11381" target="_blank" rel="noopener">link</a></li>
+              <li>Madaan, A., et al. (2023). <i>Self-Refine: Iterative Refinement with Self-Feedback.</i> NeurIPS 2023. arXiv:2310.04423. <a href="https://arxiv.org/abs/2310.04423" target="_blank" rel="noopener">link</a></li>
+              <li>Yao, S., et al. (2022). <i>ReAct: Synergizing Reasoning and Acting in Language Models.</i> ICLR 2023. arXiv:2210.03629.</li>
+              <li>Schick, T., et al. (2023). <i>Toolformer: Language Models Can Teach Themselves to Use Tools.</i> arXiv:2302.04761.</li>
+              <li>Wang, G., et al. (2023). <i>Voyager: An Open-Ended Embodied Agent with Large Language Models.</i> arXiv:2305.16291.</li>
+              <li>Corbett, J. C., et al. (2012). <i>Spanner: Google's Globally-Distributed Database.</i> OSDI 2012.</li>
+              <li>Thomson, A., Diamond, T., Weng, S., Ren, K., Shao, P., &amp; Abadi, D. J. (2012). <i>Calvin: Fast Distributed Transactions for Partitioned Database Systems.</i> SIGMOD 2012.</li>
+              <li>FoundationDB. (2018). <i>FoundationDB: A Distributed Database for Globally-Distributed Applications.</i> Apple Whitepaper. <a href="https://www.foundationdb.org/files/documentation/pdf/whitepapers/foundationdb-whitepaper.pdf" target="_blank" rel="noopener">link</a></li>
+              <li>Chacon, S., &amp; Straub, B. (2014). <i>Pro Git.</i> Apress. <a href="https://git-scm.com/book/en/v2" target="_blank" rel="noopener">link</a></li>
+              <li>Fowler, M. (2005). <i>Event Sourcing.</i> martinfowler.com. <a href="https://martinfowler.com/eaaDev/EventSourcing.html" target="_blank" rel="noopener">link</a></li>
+              <li>Fowler, M. (2011). <i>CQRS.</i> martinfowler.com. <a href="https://martinfowler.com/bliki/CQRS.html" target="_blank" rel="noopener">link</a></li>
+              <li>Shapiro, M., Preguiça, N., Baquero, C., &amp; Zawirski, M. (2011). <i>A Comprehensive Study of Convergent and Commutative Replicated Data Types.</i> RR-7506, INRIA.</li>
+              <li>Wang, X., et al. (2024). <i>OpenHands: An Open Platform for AI Software Developers as Generalist Agents.</i> arXiv:2407.16741.</li>
+              <li>Jimenez, C. E., et al. (2024). <i>SWE-bench: Can Language Models Resolve Real-World GitHub Issues?</i> ICLR 2024. arXiv:2310.06770.</li>
+              <li>Gray, J. (1981). <i>The Transaction Concept: Virtues and Limitations.</i> VLDB 1981.</li>
+              <li>Wu, Y., et al. (2024). <i>AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation.</i> COLM 2024.</li>
+              <li>Hong, S., et al. (2024). <i>MetaGPT: Meta Programming for a Multi-Agent Collaborative Framework.</i> ICLR 2024.</li>
+            </ol>
+
+            <h2 style="margin-top: 48px;">// ACKNOWLEDGMENTS</h2>
+            <p style="font-size: 12.5px; line-height: 1.75; color: var(--ink);">
+              The versioned environment builds on a long lineage of
+              transactional systems. The MVCC semantics follow PostgreSQL
+              and InnoDB. The content-addressed storage follows git. The
+              CQRS pattern follows Fowler's event-sourcing work. The
+              CRDT implementation follows Shapiro et al.'s 2011 survey.
+              The agent-facing tool design follows the ReAct and
+              Reflexion papers' insight that language models are more
+              reliable when the safe path is the easy path. The
+              DataJanitor benchmark that produced the 30% trajectory
+              reduction is part of the OpenHands evaluation suite.
+            </p>
+
+            <p style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--faint); font-size: 10px; color: var(--dim);">
+              <b style="color: var(--bright); font-weight: 500;">TAGS</b> &nbsp; agents &nbsp;·&nbsp; transactional-env &nbsp;·&nbsp; version-control &nbsp;·&nbsp; mvcc &nbsp;·&nbsp; cqrs &nbsp;·&nbsp; event-sourcing &nbsp;·&nbsp; crdt &nbsp;·&nbsp; tooling
+            </p>
+
+          </article>
+
+          <nav class="log-foot">
+            <a href="../index.html#archive">&larr; BACK TO ARCHIVE</a>
+            <div class="nav">
+              <a href="log-002.html">&larr; PREV: LOG 002</a>
+              <a href="log-004.html">NEXT: LOG 004 &rarr;</a>
+            </div>
+          </nav>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer frame">
+      <p>COPYRIGHT © MAYANK SHARMA 2026<br />ALL RIGHTS RESERVED</p>
+      <p>FIELD LOG 003<br />ROLLBACK AGENTS</p>
+      <p>DESIGNED + BUILT BY HUMAN<br />FOR INTELLIGENT SYSTEMS</p>
+    </footer>
+
+    <dialog class="command-dialog">
+      <form method="dialog">
+        <div class="command-top"><span>&gt; NAVIGATE_ARCHIVE</span><button aria-label="Close">ESC</button></div>
+        <div class="command-list">
+          <a href="../index.html"><span>01</span>SCAN / HOME</a>
+          <a href="../index.html#projects"><span>02</span>WORK / PROJECTS</a>
+          <a href="../logs.html"><span>03</span>LOGS / ALL</a>
+          <a href="../index.html#contact"><span>04</span>CONTACT</a>
+          <a href="../resume.html"><span>05</span>FILE / RESUME</a>
+          <a href="../signals.html"><span>06</span>SIGNALS / NETWORK</a>
+        </div>
+      </form>
+    </dialog>
+    <script src="../src/legacy.js"></script>
+  </body>
+</html>
